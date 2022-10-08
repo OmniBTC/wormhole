@@ -74,12 +74,12 @@ export class TokenBridgeListener implements Listener {
      */
 
     /** Is the specified fee sufficient to relay? */
-    const sufficientFee = payload.fee && payload.fee > BigInt(0);
+    // const sufficientFee = payload.fee && payload.fee > BigInt(0);
 
-    if (!sufficientFee) {
-      this.logger.debug("Token transfer does not have a sufficient fee.");
-      return false;
-    }
+    // if (!sufficientFee) {
+    //   this.logger.debug("Token transfer does not have a sufficient fee.");
+    //   return false;
+    // }
     return true;
   }
 
@@ -158,9 +158,10 @@ export class TokenBridgeListener implements Listener {
     let parsedPayload: ParsedTransferPayload;
 
     // Verify this is actually a token bridge transfer payload
-    if (!this.verifyIsPayloadV1(parsedVaa)) {
-      return "Wrong payload type";
-    }
+    // parse v3
+    // if (!this.verifyIsPayloadV1(parsedVaa)) {
+    //   return "Wrong payload type";
+    // }
     try {
       parsedPayload = await this.parsePayload(parsedVaa.payload);
     } catch (e: any) {

@@ -282,7 +282,8 @@ export class TokenBridgeRelayer implements Relayer {
     const logger = getScopedLogger(["relay"], relayLogger);
     const { parse_vaa } = await importCoreWasm();
     const parsedVAA = parse_vaa(hexToUint8Array(signedVAA));
-    if (parsedVAA.payload[0] === 1) {
+    // just relay v3 payload
+    if (parsedVAA.payload[0] === 3) {
       const transferPayload = parseTransferPayload(
         Buffer.from(parsedVAA.payload)
       );

@@ -55,6 +55,7 @@ export async function relayEVM(
     signer = new ethers.Wallet(walletPrivateKey, provider);
   }
 
+  // init wormhole faucet contract
   logger.debug("Checking to see if vaa has already been redeemed.");
   const alreadyRedeemed = await getIsTransferCompletedEth(
     chainConfigInfo.tokenBridgeAddress,
@@ -92,6 +93,8 @@ export async function relayEVM(
     // Klaytn and Fantom require specifying gasPrice
     overrides = { gasPrice: (await signer.getGasPrice()).toString() };
   }
+
+  // call wormhole faucet function
   const bridge = Bridge__factory.connect(
     chainConfigInfo.tokenBridgeAddress,
     signer
