@@ -105,10 +105,10 @@ export class TokenBridgeListener implements Listener {
       );
     });
 
-    if (!isApprovedToken) {
-      this.logger.debug("Token transfer is not for an approved token.");
-      return false;
-    }
+    // if (!isApprovedToken) {
+    //   this.logger.debug("Token transfer is not for an approved token.");
+    //   return false;
+    // }
 
     return true;
   }
