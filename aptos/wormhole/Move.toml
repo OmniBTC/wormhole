@@ -5,10 +5,10 @@ upgrade_policy = "compatible"
 
 #TODO: pin versions before mainnet release
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "main" }
-MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/", rev = "main" }
-AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib/", rev = "main" }
-AptosToken = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-token/", rev = "main" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "985f19d40457a5f09f2d741b1feca6bf7ba1f8a6" }
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/", rev = "985f19d40457a5f09f2d741b1feca6bf7ba1f8a6" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib/", rev = "985f19d40457a5f09f2d741b1feca6bf7ba1f8a6" }
+AptosToken = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-token/", rev = "985f19d40457a5f09f2d741b1feca6bf7ba1f8a6" }
 Deployer = { local = "../deployer/" }
 # U256 = { git = "https://github.com/pontem-network/u256", rev = "main"  }
 
