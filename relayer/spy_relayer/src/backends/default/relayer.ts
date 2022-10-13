@@ -9,6 +9,8 @@ import {
   parseTransferPayload,
   CHAIN_ID_UNSET,
   isTerraChain,
+  CHAIN_ID_AVAX,
+  CHAIN_ID_BSC,
 } from "@certusone/wormhole-sdk";
 
 import { REDIS_RETRY_MS, AUDIT_INTERVAL_MS, Relayer } from "../definitions";
@@ -319,6 +321,24 @@ export class TokenBridgeRelayer implements Relayer {
           transferPayload.originChain === transferPayload.targetChain &&
           nativeOrigin?.toLowerCase() ===
             chainConfigInfo.wrappedAsset?.toLowerCase();
+        const targetAddress = transferPayload.targetAddress;
+        let diamondAddress = "";
+        if (chainConfigInfo.chainId === CHAIN_ID_AVAX) {
+          diamondAddress =
+            "000000000000000000000000dee3a4fa877658e7e5efd4a9332de1b673abf75f";
+        } else if (chainConfigInfo.chainId === CHAIN_ID_BSC) {
+          diamondAddress =
+            "000000000000000000000000079838ab3cab29f5bda0ffd62547c90e8aeb6ecc";
+        }
+
+        if (targetAddress !== diamondAddress) {
+          return {
+            status: Status.Completed,
+            result: "Not Target Diamond Address",
+          };
+        }
+        logger.debug("target address: [" + targetAddress + "]");
+
         logger.debug(
           "isEVMChain: originAddress: [" +
             transferPayload.originAddress +

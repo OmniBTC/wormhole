@@ -1333,9 +1333,9 @@ export async function relayEVM(
 
   let diamond_address = "";
   if (chainConfigInfo.chainId === CHAIN_ID_AVAX) {
-    diamond_address = "0x85211a005319d407EC6479B29e183e901FFc0155";
+    diamond_address = "0xDEE3a4fA877658E7e5efD4A9332de1b673ABF75f";
   } else if (chainConfigInfo.chainId === CHAIN_ID_BSC) {
-    diamond_address = "0x10D2B31d8058Bc02A51950b60F72335EBfb07Cf3";
+    diamond_address = "0x379838Ab3cab29F5BdA0FFD62547c90E8AeB6Ecc";
   }
 
   const diamond = new ethers.Contract(diamond_address, abi, provider);
