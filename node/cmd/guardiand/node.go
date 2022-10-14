@@ -16,6 +16,7 @@ import (
 	"github.com/certusone/wormhole/node/pkg/watchers/algorand"
 	"github.com/certusone/wormhole/node/pkg/watchers/evm"
 	"github.com/certusone/wormhole/node/pkg/watchers/near"
+	"github.com/certusone/wormhole/node/pkg/watchers/aptos"
 	"github.com/certusone/wormhole/node/pkg/watchers/solana"
 
 	"github.com/benbjohnson/clock"
@@ -137,7 +138,12 @@ var (
 	wormchainWS  *string
 	wormchainLCD *string
 
-	solanaRPC *string
+	aptosRPC     *string
+	aptosAccount *string
+	aptosHandle  *string
+
+	solanaWsRPC *string
+	solanaRPC   *string
 
 	pythnetContract *string
 	pythnetRPC      *string
@@ -262,6 +268,11 @@ func init() {
 	wormchainWS = NodeCmd.Flags().String("wormchainWS", "", "Path to wormholechaind root for websocket connection")
 	wormchainLCD = NodeCmd.Flags().String("wormchainLCD", "", "Path to LCD service root for http calls")
 
+	aptosRPC = NodeCmd.Flags().String("aptosRPC", "", "aptos RPC URL")
+	aptosAccount = NodeCmd.Flags().String("aptosAccount", "", "aptos account")
+	aptosHandle = NodeCmd.Flags().String("aptosHandle", "", "aptos handle")
+
+	solanaWsRPC = NodeCmd.Flags().String("solanaWS", "", "Solana Websocket URL (required")
 	solanaRPC = NodeCmd.Flags().String("solanaRPC", "", "Solana RPC URL (required")
 
 	pythnetContract = NodeCmd.Flags().String("pythnetContract", "", "Address of the PythNet program (required)")
@@ -582,6 +593,18 @@ func runNode(cmd *cobra.Command, args []string) {
 	} else if *xplaLCD != "" || *xplaContract != "" {
 		logger.Fatal("If --xplaWS is not specified, then --xplaLCD and --xplaContract must not be specified")
 	}
+
+	if *unsafeDevMode {
+		if *aptosRPC != "" {
+			if *aptosAccount == "" {
+				logger.Fatal("If --aptosRPC is specified, then --aptosAccount must be specified")
+			}
+			if *aptosHandle == "" {
+				logger.Fatal("If --aptosRPC is specified, then --aptosHandle must be specified")
+			}
+		}
+	}
+
 	if *testnetMode {
 		if *ethRopstenRPC == "" {
 			logger.Fatal("Please specify --ethRopstenRPC")
@@ -638,6 +661,9 @@ func runNode(cmd *cobra.Command, args []string) {
 		}
 		if *arbitrumContract != "" && !*unsafeDevMode {
 			logger.Fatal("Please do not specify --arbitrumContract")
+		}
+		if *aptosRPC != "" && !*unsafeDevMode {
+			logger.Fatal("Please do not specify --aptosRPC")
 		}
 	}
 	if *nodeName == "" {
@@ -845,6 +871,9 @@ func runNode(cmd *cobra.Command, args []string) {
 	if *nearRPC != "" {
 		chainObsvReqC[vaa.ChainIDNear] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	}
+	if *aptosRPC != "" {
+		chainObsvReqC[vaa.ChainIDAptos] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
+	}
 	chainObsvReqC[vaa.ChainIDAurora] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	chainObsvReqC[vaa.ChainIDFantom] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	chainObsvReqC[vaa.ChainIDKarura] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
@@ -852,8 +881,6 @@ func runNode(cmd *cobra.Command, args []string) {
 	chainObsvReqC[vaa.ChainIDKlaytn] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	chainObsvReqC[vaa.ChainIDCelo] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	chainObsvReqC[vaa.ChainIDPythNet] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
-	chainObsvReqC[vaa.ChainIDMoonbeam] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
-	chainObsvReqC[vaa.ChainIDXpla] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 	if *testnetMode {
 		chainObsvReqC[vaa.ChainIDNeon] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
 		chainObsvReqC[vaa.ChainIDEthereumRopsten] = make(chan *gossipv1.ObservationRequest, observationRequestBufferSize)
@@ -1091,6 +1118,12 @@ func runNode(cmd *cobra.Command, args []string) {
 			logger.Info("Starting Wormchain watcher")
 			if err := supervisor.Run(ctx, "wormchainwatch",
 				wormchain.NewWatcher(*wormchainWS, *wormchainLCD, lockC, setC, chainObsvReqC[vaa.ChainIDWormchain]).Run); err != nil {
+				return err
+			}
+		}
+		if *aptosRPC != "" {
+			if err := supervisor.Run(ctx, "aptoswatch",
+				aptos.NewWatcher(*aptosRPC, *aptosAccount, *aptosHandle, lockC, chainObsvReqC[vaa.ChainIDAptos]).Run); err != nil {
 				return err
 			}
 		}
