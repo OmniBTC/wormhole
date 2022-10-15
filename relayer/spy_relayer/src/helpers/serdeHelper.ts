@@ -6,7 +6,18 @@ import { ChainId } from "@certusone/wormhole-sdk";
 
 let logger = getLogger();
 
-function readAbi(f: string) {
+export function leftPaddingAddress(addr: string): string {
+  let normalAddr = addr.replace("0x", "");
+  if (normalAddr.length < 64) {
+    normalAddr = "0".repeat(64 - normalAddr.length) + normalAddr;
+  }
+  if (!normalAddr.startsWith("0x")) {
+    normalAddr = "0x" + normalAddr;
+  }
+  return normalAddr;
+}
+
+export function readAbi(f: string) {
   if (fs.existsSync(f)) //判断是否存在此文件
   {
     //读取文件内容，并转化为Json对象

@@ -225,13 +225,7 @@ export class TokenBridgeListener implements Listener {
     const validationResults: ParsedVaa<ParsedTransferPayload> | string =
       await this.validate(rawVaa);
 
-    const vaa = await addVaaInMongo(rawVaa);
-    if (vaa!= null) {
-      const result = await findVaaInMongo(vaa.emitterChainId, vaa.emitterAddress, "2337")
-      if (result != null){
-        console.log("4444",result.sequence)
-      }
-    }
+    await addVaaInMongo(rawVaa);
 
     if (typeof validationResults === "string") {
       this.logger.debug(`Skipping spied request: ${validationResults}`);

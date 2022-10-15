@@ -49,6 +49,11 @@ export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
       },
       { upsert: true }
     );
+    logger.info("Add vaa to mongo, sequence: " + vaa.sequence +
+      " emitterAddress: " + vaa.emitterAddress +
+      " emitterChainId: " + vaa.emitterChainId +
+      " hash: " + vaa.hash
+    );
     return vaa;
   } catch (e) {
     logger.error("Add vaa to mongo fail: ", e);
