@@ -113,6 +113,14 @@ Start a redis container:
 docker run --rm -p6379:6379 --name redis-docker -d redis
 ```
 
+### Run Mongo
+
+Start a mongo container:
+
+```bash
+docker run --rm -p 27017:27017 -v <LocalDirectoryPath>:/data/db --name mongodb-docker -d mongo
+```
+
 ### Run the Guardian Spy
 
 The spy connects to the wormhole guardian peer to peer network and listens for new VAAs. It publishes those via a socket and websocket that the listener subscribes to. If you want to run the spy built from source, change `ghcr.io/wormhole-foundation/guardiand:latest` to `guardian` after building the `guardian` image.
