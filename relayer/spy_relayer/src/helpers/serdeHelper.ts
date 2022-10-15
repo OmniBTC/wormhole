@@ -2,7 +2,7 @@ import * as fs from "fs";
 import { ethers } from "ethers";
 import { newProvider } from "../relayer/evm";
 import { getLogger } from "./logHelper";
-import { ChainId } from "@certusone/wormhole-sdk";
+import { ChainId, hexToUint8Array } from "@certusone/wormhole-sdk";
 
 let logger = getLogger();
 
@@ -202,5 +202,13 @@ export async function parseWormholePayload(vaaPayload: Uint8Array): Promise<Worm
     soData,
     dstSwapData
   };
+}
+
+export async function parseVAAToWormholePayload(rawVaa: Uint8Array): Promise<{ vaa: VAA, transferPayload: TransferWithPayload, wormholePayload: WormholePayload }> {
+  const vaa = await parseVAA(rawVaa);
+  const transferPayload = await parseTransferWithPayload(hexToUint8Array(vaa.payload.replace("0x", "")));
+  const wormholePayload = await parseWormholePayload(hexToUint8Array(transferPayload.payload.replace("0x", "")));
+  return { vaa, transferPayload, wormholePayload };
+
 }
 

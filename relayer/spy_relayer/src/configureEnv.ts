@@ -21,8 +21,7 @@ export const getCommonEnvironment: () => CommonEnvironment = () => {
   if (loggingEnv) {
     return loggingEnv;
   } else {
-    const env = createCommonEnvironment();
-    loggingEnv = env;
+    loggingEnv = createCommonEnvironment();
     return loggingEnv;
   }
 };
@@ -107,6 +106,7 @@ export type ListenerEnvironment = {
   restPort: number;
   numSpyWorkers: number;
   supportedTokens: { chainId: ChainId; address: string }[];
+  diamondAddress: { chainId: ChainId; address: string }[];
 };
 
 let listenerEnv: ListenerEnvironment | undefined = undefined;
@@ -115,8 +115,7 @@ export const getListenerEnvironment: () => ListenerEnvironment = () => {
   if (listenerEnv) {
     return listenerEnv;
   } else {
-    const env = createListenerEnvironment();
-    listenerEnv = env;
+    listenerEnv = createListenerEnvironment();
     return listenerEnv;
   }
 };
@@ -127,6 +126,7 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
   let restPort: number;
   let numSpyWorkers: number;
   let supportedTokens: { chainId: ChainId; address: string }[] = [];
+  let diamondAddress: { chainId: ChainId; address: string }[] = [];
   const logger = getLogger();
   let mongoUrl;
 
@@ -134,6 +134,22 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
     mongoUrl = "mongodb://localhost:27017/runoob";
   } else {
     mongoUrl = "mongodb://" + process.env.MONGODB_HOST + "/runoob";
+  }
+
+  if (process.env.DIAMOND_ADDRESS) {
+    const array = eval(process.env.DIAMOND_ADDRESS);
+    if (array && Array.isArray(array)) {
+      array.forEach((token: any) => {
+        if (token.chainId && token.address) {
+          diamondAddress.push({
+            chainId: token.chainId,
+            address: token.address
+          });
+        } else {
+          throw new Error("Invalid token record. " + token.toString());
+        }
+      });
+    }
   }
 
   if (!process.env.SPY_SERVICE_HOST) {
@@ -214,7 +230,8 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
     spyServiceFilters,
     restPort,
     numSpyWorkers,
-    supportedTokens
+    supportedTokens,
+    diamondAddress
   };
 };
 
@@ -224,8 +241,7 @@ export const getRelayerEnvironment: () => RelayerEnvironment = () => {
   if (relayerEnv) {
     return relayerEnv;
   } else {
-    const env = createRelayerEnvironment();
-    relayerEnv = env;
+    relayerEnv = createRelayerEnvironment();
     return relayerEnv;
   }
 };
@@ -256,11 +272,7 @@ const createRelayerEnvironment: () => RelayerEnvironment = () => {
       "Missing required environment variable: CLEAR_REDIS_ON_INIT"
     );
   } else {
-    if (process.env.CLEAR_REDIS_ON_INIT.toLowerCase() === "true") {
-      clearRedisOnInit = true;
-    } else {
-      clearRedisOnInit = false;
-    }
+    clearRedisOnInit = process.env.CLEAR_REDIS_ON_INIT.toLowerCase() === "true";
   }
 
   if (process.env.DEMOTE_WORKING_ON_INIT === undefined) {
@@ -268,11 +280,7 @@ const createRelayerEnvironment: () => RelayerEnvironment = () => {
       "Missing required environment variable: DEMOTE_WORKING_ON_INIT"
     );
   } else {
-    if (process.env.DEMOTE_WORKING_ON_INIT.toLowerCase() === "true") {
-      demoteWorkingOnInit = true;
-    } else {
-      demoteWorkingOnInit = false;
-    }
+    demoteWorkingOnInit = process.env.DEMOTE_WORKING_ON_INIT.toLowerCase() === "true";
   }
 
   supportedChains = loadChainConfig();

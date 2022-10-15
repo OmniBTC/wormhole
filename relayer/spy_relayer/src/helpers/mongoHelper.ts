@@ -13,7 +13,7 @@ export const mongoClient = new MongoClient(mongoUrl);
 export const wormholeDB = mongoClient.db("Wormhole");
 
 
-interface VAAStorage extends VAA {
+export interface VAAStorage extends VAA {
   hexString: string;
 }
 
