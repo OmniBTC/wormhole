@@ -274,7 +274,7 @@
               "type": "bytes32"
             }
           ],
-          "internalType": "struct IWormhole.VM",
+          "internalType": "struct IWormhole.VAA",
           "name": "vm",
           "type": "tuple"
         },
@@ -382,7 +382,7 @@
               "type": "bytes32"
             }
           ],
-          "internalType": "struct IWormhole.VM",
+          "internalType": "struct IWormhole.VAA",
           "name": "vm",
           "type": "tuple"
         }
@@ -569,7 +569,7 @@
               "type": "bytes32"
             }
           ],
-          "internalType": "struct IWormhole.VM",
+          "internalType": "struct IWormhole.VAA",
           "name": "vm",
           "type": "tuple"
         }
@@ -921,7 +921,7 @@
             "visibility": "public"
           },
           {
-            "canonicalName": "IWormhole.VM",
+            "canonicalName": "IWormhole.VAA",
             "id": 8113,
             "members": [
               {
@@ -1238,7 +1238,7 @@
                 "visibility": "internal"
               }
             ],
-            "name": "VM",
+            "name": "VAA",
             "nameLocation": "420:2:47",
             "nodeType": "StructDefinition",
             "scope": 8235,
@@ -1599,14 +1599,14 @@
                   "storageLocation": "memory",
                   "typeDescriptions": {
                     "typeIdentifier": "t_struct$_VM_$8113_memory_ptr",
-                    "typeString": "struct IWormhole.VM"
+                    "typeString": "struct IWormhole.VAA"
                   },
                   "typeName": {
                     "id": 8141,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
                       "id": 8140,
-                      "name": "VM",
+                      "name": "VAA",
                       "nodeType": "IdentifierPath",
                       "referencedDeclaration": 8113,
                       "src": "1184:2:47"
@@ -1615,7 +1615,7 @@
                     "src": "1184:2:47",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_VM_$8113_storage_ptr",
-                      "typeString": "struct IWormhole.VM"
+                      "typeString": "struct IWormhole.VAA"
                     }
                   },
                   "visibility": "internal"
@@ -1709,14 +1709,14 @@
                   "storageLocation": "memory",
                   "typeDescriptions": {
                     "typeIdentifier": "t_struct$_VM_$8113_memory_ptr",
-                    "typeString": "struct IWormhole.VM"
+                    "typeString": "struct IWormhole.VAA"
                   },
                   "typeName": {
                     "id": 8150,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
                       "id": 8149,
-                      "name": "VM",
+                      "name": "VAA",
                       "nodeType": "IdentifierPath",
                       "referencedDeclaration": 8113,
                       "src": "1289:2:47"
@@ -1725,7 +1725,7 @@
                     "src": "1289:2:47",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_VM_$8113_storage_ptr",
-                      "typeString": "struct IWormhole.VM"
+                      "typeString": "struct IWormhole.VAA"
                     }
                   },
                   "visibility": "internal"
@@ -2047,14 +2047,14 @@
                   "storageLocation": "memory",
                   "typeDescriptions": {
                     "typeIdentifier": "t_struct$_VM_$8113_memory_ptr",
-                    "typeString": "struct IWormhole.VM"
+                    "typeString": "struct IWormhole.VAA"
                   },
                   "typeName": {
                     "id": 8179,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
                       "id": 8178,
-                      "name": "VM",
+                      "name": "VAA",
                       "nodeType": "IdentifierPath",
                       "referencedDeclaration": 8113,
                       "src": "1674:2:47"
@@ -2063,7 +2063,7 @@
                     "src": "1674:2:47",
                     "typeDescriptions": {
                       "typeIdentifier": "t_struct$_VM_$8113_storage_ptr",
-                      "typeString": "struct IWormhole.VM"
+                      "typeString": "struct IWormhole.VAA"
                     }
                   },
                   "visibility": "internal"
@@ -2703,7 +2703,7 @@
   "opcodes": "",
   "pcMap": {},
   "sha1": "7c410b7736231138802da00543d9b32b1c22e7ce",
-  "source": "// SPDX-License-Identifier: Apache 2\n\npragma solidity ^0.8.0;\n\ninterface IWormhole {\n    struct Provider {\n        uint16 chainId;\n        uint16 governanceChainId;\n        bytes32 governanceContract;\n    }\n\n    struct GuardianSet {\n        address[] keys;\n        uint32 expirationTime;\n    }\n\n    struct Signature {\n        bytes32 r;\n        bytes32 s;\n        uint8 v;\n        uint8 guardianIndex;\n    }\n\n    struct VM {\n        uint8 version;\n        uint32 timestamp;\n        uint32 nonce;\n        uint16 emitterChainId;\n        bytes32 emitterAddress;\n        uint64 sequence;\n        uint8 consistencyLevel;\n        bytes payload;\n        uint32 guardianSetIndex;\n        Signature[] signatures;\n        bytes32 hash;\n    }\n\n    event LogMessagePublished(\n        address indexed sender,\n        uint64 sequence,\n        uint32 nonce,\n        bytes payload,\n        uint8 consistencyLevel\n    );\n\n    function publishMessage(\n        uint32 nonce,\n        bytes memory payload,\n        uint8 consistencyLevel\n    ) external payable returns (uint64 sequence);\n\n    function parseAndVerifyVM(bytes calldata encodedVM)\n        external\n        view\n        returns (\n            VM memory vm,\n            bool valid,\n            string memory reason\n        );\n\n    function verifyVM(VM memory vm)\n        external\n        view\n        returns (bool valid, string memory reason);\n\n    function verifySignatures(\n        bytes32 hash,\n        Signature[] memory signatures,\n        GuardianSet memory guardianSet\n    ) external pure returns (bool valid, string memory reason);\n\n    function parseVM(bytes memory encodedVM)\n        external\n        pure\n        returns (VM memory vm);\n\n    function getGuardianSet(uint32 index)\n        external\n        view\n        returns (GuardianSet memory);\n\n    function getCurrentGuardianSetIndex() external view returns (uint32);\n\n    function getGuardianSetExpiry() external view returns (uint32);\n\n    function governanceActionIsConsumed(bytes32 hash)\n        external\n        view\n        returns (bool);\n\n    function isInitialized(address impl) external view returns (bool);\n\n    function chainId() external view returns (uint16);\n\n    function governanceChainId() external view returns (uint16);\n\n    function governanceContract() external view returns (bytes32);\n\n    function messageFee() external view returns (uint256);\n}\n",
+  "source": "// SPDX-License-Identifier: Apache 2\n\npragma solidity ^0.8.0;\n\ninterface IWormhole {\n    struct Provider {\n        uint16 chainId;\n        uint16 governanceChainId;\n        bytes32 governanceContract;\n    }\n\n    struct GuardianSet {\n        address[] keys;\n        uint32 expirationTime;\n    }\n\n    struct Signature {\n        bytes32 r;\n        bytes32 s;\n        uint8 v;\n        uint8 guardianIndex;\n    }\n\n    struct VAA {\n        uint8 version;\n        uint32 timestamp;\n        uint32 nonce;\n        uint16 emitterChainId;\n        bytes32 emitterAddress;\n        uint64 sequence;\n        uint8 consistencyLevel;\n        bytes payload;\n        uint32 guardianSetIndex;\n        Signature[] signatures;\n        bytes32 hash;\n    }\n\n    event LogMessagePublished(\n        address indexed sender,\n        uint64 sequence,\n        uint32 nonce,\n        bytes payload,\n        uint8 consistencyLevel\n    );\n\n    function publishMessage(\n        uint32 nonce,\n        bytes memory payload,\n        uint8 consistencyLevel\n    ) external payable returns (uint64 sequence);\n\n    function parseAndVerifyVM(bytes calldata encodedVM)\n        external\n        view\n        returns (\n            VAA memory vm,\n            bool valid,\n            string memory reason\n        );\n\n    function verifyVM(VAA memory vm)\n        external\n        view\n        returns (bool valid, string memory reason);\n\n    function verifySignatures(\n        bytes32 hash,\n        Signature[] memory signatures,\n        GuardianSet memory guardianSet\n    ) external pure returns (bool valid, string memory reason);\n\n    function parseVM(bytes memory encodedVM)\n        external\n        pure\n        returns (VAA memory vm);\n\n    function getGuardianSet(uint32 index)\n        external\n        view\n        returns (GuardianSet memory);\n\n    function getCurrentGuardianSetIndex() external view returns (uint32);\n\n    function getGuardianSetExpiry() external view returns (uint32);\n\n    function governanceActionIsConsumed(bytes32 hash)\n        external\n        view\n        returns (bool);\n\n    function isInitialized(address impl) external view returns (bool);\n\n    function chainId() external view returns (uint16);\n\n    function governanceChainId() external view returns (uint16);\n\n    function governanceContract() external view returns (bytes32);\n\n    function messageFee() external view returns (uint256);\n}\n",
   "sourceMap": "",
   "sourcePath": "contracts/Interfaces/IWormhole.sol",
   "type": "interface"

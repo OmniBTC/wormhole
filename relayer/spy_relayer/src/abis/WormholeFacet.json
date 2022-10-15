@@ -17905,7 +17905,7 @@
                         "src": "15572:68:5",
                         "typeDescriptions": {
                           "typeIdentifier": "t_function_external_pure$_t_bytes_memory_ptr_$returns$_t_struct$_VM_$5440_memory_ptr_$",
-                          "typeString": "function (bytes memory) pure external returns (struct IWormhole.VM memory)"
+                          "typeString": "function (bytes memory) pure external returns (struct IWormhole.VAA memory)"
                         }
                       },
                       "id": 1288,
@@ -17920,7 +17920,7 @@
                       "tryCall": false,
                       "typeDescriptions": {
                         "typeIdentifier": "t_struct$_VM_$5440_memory_ptr",
-                        "typeString": "struct IWormhole.VM memory"
+                        "typeString": "struct IWormhole.VAA memory"
                       }
                     },
                     "id": 1289,

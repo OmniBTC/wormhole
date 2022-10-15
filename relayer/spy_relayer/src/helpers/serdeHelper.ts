@@ -28,13 +28,13 @@ const tokenBridgeAbiFile = "src/abis/TokenBridge.json";
 const tokenBridgeAbi = readAbi(tokenBridgeAbiFile);
 export const tokenBridge = new ethers.Contract("0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7", tokenBridgeAbi, bscMainProvider);
 
-export type VM = {
+export type VAA = {
   version: number;
   timestamp: number;
   nonce: number;
   emitterChainId: ChainId;
   emitterAddress: string;
-  sequence: number;
+  sequence: string;
   consistencyLevel: number;
   payload: string;
 
@@ -81,7 +81,7 @@ export type TransferWithPayload = {
   payload: string;
 };
 
-export async function parseVAA(rawVaa: Uint8Array): Promise<VM> {
+export async function parseVAA(rawVaa: Uint8Array): Promise<VAA> {
   let result = await wormhole.parseVM(rawVaa);
   return {
     version: result[0],
@@ -89,7 +89,7 @@ export async function parseVAA(rawVaa: Uint8Array): Promise<VM> {
     nonce: result[2],
     emitterChainId: result[3],
     emitterAddress: result[4],
-    sequence: result[5],
+    sequence: result[5].toString(),
     consistencyLevel: result[6],
     payload: result[7],
     guardianSetIndex: result[8],

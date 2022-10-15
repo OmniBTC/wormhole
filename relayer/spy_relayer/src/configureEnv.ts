@@ -1,9 +1,4 @@
-import {
-  ChainId,
-  CHAIN_ID_SOLANA,
-  isTerraChain,
-  nativeToHexString,
-} from "@certusone/wormhole-sdk";
+import { CHAIN_ID_SOLANA, ChainId, isTerraChain, nativeToHexString } from "@certusone/wormhole-sdk";
 import { getLogger } from "./helpers/logHelper";
 
 export type SupportedToken = {
@@ -106,6 +101,7 @@ export type ChainConfigInfo = {
 };
 
 export type ListenerEnvironment = {
+  mongoUrl: string
   spyServiceHost: string;
   spyServiceFilters: { chainId: ChainId; emitterAddress: string }[];
   restPort: number;
@@ -132,6 +128,13 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
   let numSpyWorkers: number;
   let supportedTokens: { chainId: ChainId; address: string }[] = [];
   const logger = getLogger();
+  let mongoUrl;
+
+  if (!process.env.MONGODB_HOST) {
+    mongoUrl = "mongodb://localhost:27017/runoob";
+  } else {
+    mongoUrl = "mongodb://" + process.env.MONGODB_HOST + "/runoob";
+  }
 
   if (!process.env.SPY_SERVICE_HOST) {
     throw new Error("Missing required environment variable: SPY_SERVICE_HOST");
@@ -154,11 +157,11 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
         if (filter.chainId && filter.emitterAddress) {
           logger.info(
             "nativeToHexString: " +
-              nativeToHexString(filter.emitterAddress, filter.chainId)
+            nativeToHexString(filter.emitterAddress, filter.chainId)
           );
           spyServiceFilters.push({
             chainId: filter.chainId as ChainId,
-            emitterAddress: filter.emitterAddress,
+            emitterAddress: filter.emitterAddress
           });
         } else {
           throw new Error("Invalid filter record. " + filter.toString());
@@ -194,7 +197,7 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
         if (token.chainId && token.address) {
           supportedTokens.push({
             chainId: token.chainId,
-            address: token.address,
+            address: token.address
           });
         } else {
           throw new Error("Invalid token record. " + token.toString());
@@ -206,11 +209,12 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
   logger.info("Setting the listener backend...");
 
   return {
+    mongoUrl,
     spyServiceHost,
     spyServiceFilters,
     restPort,
     numSpyWorkers,
-    supportedTokens,
+    supportedTokens
   };
 };
 
@@ -285,7 +289,7 @@ const createRelayerEnvironment: () => RelayerEnvironment = () => {
         if (token.chainId && token.address) {
           supportedTokens.push({
             chainId: token.chainId,
-            address: token.address,
+            address: token.address
           });
         } else {
           throw new Error("Invalid token record. " + token.toString());
@@ -302,7 +306,7 @@ const createRelayerEnvironment: () => RelayerEnvironment = () => {
     redisPort,
     clearRedisOnInit,
     demoteWorkingOnInit,
-    supportedTokens,
+    supportedTokens
   };
 };
 
@@ -337,7 +341,7 @@ export function loadChainConfig(): ChainConfigInfo[] {
     if (!privateKeyObj) {
       throw new Error(
         "Failed to find private key object for configured chain ID: " +
-          element.chainId
+        element.chainId
       );
     }
 
@@ -430,7 +434,7 @@ function createSolanaChainConfig(
     tokenBridgeAddress,
     bridgeAddress,
     solanaPrivateKey,
-    wrappedAsset,
+    wrappedAsset
   };
 }
 
@@ -508,7 +512,7 @@ function createTerraChainConfig(
     terraChainId,
     terraCoin,
     terraGasPriceUrl,
-    isTerraClassic,
+    isTerraClassic
   };
 }
 
@@ -567,6 +571,6 @@ function createEvmChainConfig(
     nodeUrl,
     tokenBridgeAddress,
     walletPrivateKey,
-    wrappedAsset,
+    wrappedAsset
   };
 }
