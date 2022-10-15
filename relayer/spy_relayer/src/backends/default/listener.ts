@@ -1,34 +1,30 @@
 /** The default backend is relaying payload 1 token bridge messages only */
 import {
-  ChainId,
   CHAIN_ID_SOLANA,
-  uint8ArrayToHex,
-  tryHexToNativeString,
+  ChainId,
   getEmitterAddressEth,
   getEmitterAddressSolana,
   getEmitterAddressTerra,
-  parseTransferPayload,
   isTerraChain,
+  parseTransferPayload,
+  tryHexToNativeString,
+  uint8ArrayToHex
 } from "@certusone/wormhole-sdk";
 import { getListenerEnvironment } from "../../configureEnv";
 import { getScopedLogger, ScopedLogger } from "../../helpers/logHelper";
+import { ParsedTransferPayload, ParsedVaa, parseVaaTyped } from "../../listener/validation";
+import { Listener, TypedFilter } from "../definitions";
 import {
-  ParsedVaa,
-  ParsedTransferPayload,
-  parseVaaTyped,
-} from "../../listener/validation";
-import { TypedFilter, Listener } from "../definitions";
-import {
+  checkQueue,
   initPayloadWithVAA,
   storeInRedis,
-  checkQueue,
   StoreKey,
   storeKeyFromParsedVAA,
   storeKeyToJson,
   StorePayload,
-  storePayloadToJson,
+  storePayloadToJson
 } from "../../helpers/redisHelper";
-import { addVaaInMongo, findVaaInMongo } from "../../helpers/mongoHelper";
+import { addVaaInMongo } from "../../helpers/mongoHelper";
 
 async function encodeEmitterAddress(
   myChainId: ChainId,
@@ -44,6 +40,8 @@ async function encodeEmitterAddress(
 
   return getEmitterAddressEth(emitterAddressStr);
 }
+
+export const emitChainIdToAddress: { [key: number]: string; } = {};
 
 /** Listener for payload 1 token bridge messages only */
 export class TokenBridgeListener implements Listener {
@@ -191,12 +189,12 @@ export class TokenBridgeListener implements Listener {
       const filter = env.spyServiceFilters[i];
       this.logger.info(
         "Getting spyServiceFilter[" +
-          i +
-          "]: chainId = " +
-          filter.chainId +
-          ", emmitterAddress = [" +
-          filter.emitterAddress +
-          "]"
+        i +
+        "]: chainId = " +
+        filter.chainId +
+        ", emmitterAddress = [" +
+        filter.emitterAddress +
+        "]"
       );
       const typedFilter = {
         emitterFilter: {
@@ -204,15 +202,16 @@ export class TokenBridgeListener implements Listener {
           emitterAddress: await encodeEmitterAddress(
             filter.chainId,
             filter.emitterAddress
-          ),
-        },
+          )
+        }
       };
+      emitChainIdToAddress[filter.chainId] = filter.emitterAddress
       this.logger.info(
         "adding filter: chainId: [" +
-          typedFilter.emitterFilter.chainId +
-          "], emitterAddress: [" +
-          typedFilter.emitterFilter.emitterAddress +
-          "]"
+        typedFilter.emitterFilter.chainId +
+        "], emitterAddress: [" +
+        typedFilter.emitterFilter.emitterAddress +
+        "]"
       );
       filters.push(typedFilter);
     }
@@ -242,24 +241,24 @@ export class TokenBridgeListener implements Listener {
 
     this.logger.info(
       "forwarding vaa to relayer: emitter: [" +
-        parsedVaa.emitterChain +
-        ":" +
-        uint8ArrayToHex(parsedVaa.emitterAddress) +
-        "], seqNum: " +
-        parsedVaa.sequence +
-        ", payload: origin: [" +
-        parsedVaa.payload.originAddress +
-        ":" +
-        parsedVaa.payload.originAddress +
-        "], target: [" +
-        parsedVaa.payload.targetChain +
-        ":" +
-        parsedVaa.payload.targetAddress +
-        "],  amount: " +
-        parsedVaa.payload.amount +
-        "],  fee: " +
-        parsedVaa.payload.fee +
-        ", "
+      parsedVaa.emitterChain +
+      ":" +
+      uint8ArrayToHex(parsedVaa.emitterAddress) +
+      "], seqNum: " +
+      parsedVaa.sequence +
+      ", payload: origin: [" +
+      parsedVaa.payload.originAddress +
+      ":" +
+      parsedVaa.payload.originAddress +
+      "], target: [" +
+      parsedVaa.payload.targetChain +
+      ":" +
+      parsedVaa.payload.targetAddress +
+      "],  amount: " +
+      parsedVaa.payload.amount +
+      "],  fee: " +
+      parsedVaa.payload.fee +
+      ", "
     );
 
     const redisPayload: StorePayload = initPayloadWithVAA(

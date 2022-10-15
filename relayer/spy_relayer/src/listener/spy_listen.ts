@@ -6,6 +6,7 @@ import { PromHelper } from "../helpers/promHelpers";
 import { sleep } from "../helpers/utils";
 import { hexToUint8Array } from "@certusone/wormhole-sdk";
 import { wormholeAppInit } from "./vaa_req";
+import { getUnProcessSwap } from "./vaa_compensate";
 
 let metrics: PromHelper;
 let env: ListenerEnvironment;
@@ -39,7 +40,9 @@ export async function run(ph: PromHelper) {
 
   let typedFilters = await getBackend().listener.getEmitterFilters();
   const wrappedFilters = { filters: typedFilters };
-  
+  // Must after getEmitterFilters to init emitChainIdToAddress
+  await getUnProcessSwap();
+
   await wormholeAppInit();
 
   while (true) {
