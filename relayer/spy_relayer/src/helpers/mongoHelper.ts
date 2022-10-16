@@ -1,10 +1,10 @@
 import { MongoClient } from "mongodb";
 import { getListenerEnvironment } from "../configureEnv";
-import { getLogger } from "./logHelper";
+import { getScopedLogger } from "./logHelper";
 import { parseVAA, VAA } from "./serdeHelper";
 import { ChainId, uint8ArrayToHex } from "@certusone/wormhole-sdk";
 
-const logger = getLogger();
+const logger = getScopedLogger(["Mongo"]);
 
 const mongoUrl = getListenerEnvironment().mongoUrl;
 
@@ -22,7 +22,6 @@ export const vaaCol = wormholeDB.collection<VAAStorage>("VAAStorage");
 
 export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
   try {
-    logger.info("addVaaInMongo");
     const vaa = await parseVAA(rawVaa);
     await vaaCol.updateOne(
       {
@@ -83,4 +82,9 @@ export async function findVaaInMongo(
   }
   return null;
 }
+
+export async function addGasInMongo(_gasVaa: Uint8Array) {
+//  todo! add estimateGas estimateGasPrice actualGas actualGasPrice
+}
+
 

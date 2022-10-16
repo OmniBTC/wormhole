@@ -110,7 +110,7 @@ export async function parseVAA(rawVaa: Uint8Array): Promise<VAA> {
 }
 
 export async function parseTransferWithPayload(vaaPayload: Uint8Array): Promise<TransferWithPayload> {
-  let result = await wormhole.parseVM(vaaPayload);
+  let result = await tokenBridge.parseTransferWithPayload(vaaPayload);
   return {
     payloadID: result[0],
     amount: result[1],
@@ -124,7 +124,7 @@ export async function parseTransferWithPayload(vaaPayload: Uint8Array): Promise<
 }
 
 export async function parseTransfer(vaaPayload: Uint8Array): Promise<Transfer> {
-  let result = await wormhole.parseVM(vaaPayload);
+  let result = await tokenBridge.parseTransfer(vaaPayload);
   return {
     payloadID: result[0],
     amount: result[1],
