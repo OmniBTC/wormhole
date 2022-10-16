@@ -170,8 +170,8 @@ export type WormholePayload = {
   dstSwapData: Array<NormalizedSwapData>
 };
 
-export async function parseWormholePayload(vaaPayload: Uint8Array): Promise<WormholePayload> {
-  let result = await wormholeFacet.decodeWormholePayload(vaaPayload);
+export async function parseWormholePayload(transferPayload: Uint8Array): Promise<WormholePayload> {
+  let result = await wormholeFacet.decodeWormholePayload(transferPayload);
   const dstMaxGas = result[0];
   const dstMaxGasPrice = result[1];
   const soData: NormalizedSoData = {
@@ -187,12 +187,12 @@ export async function parseWormholePayload(vaaPayload: Uint8Array): Promise<Worm
   for (let i = 0; i < result[3].length; i++) {
     dstSwapData.push(
       {
-        callTo: result[3][0],
-        approveTo: result[3][1],
-        sendingAssetId: result[3][2],
-        receivingAssetId: result[3][3],
-        fromAmount: result[3][4],
-        callData: result[3][5]
+        callTo: result[3][i][0],
+        approveTo: result[3][i][1],
+        sendingAssetId: result[3][i][2],
+        receivingAssetId: result[3][i][3],
+        fromAmount: result[3][i][4],
+        callData: result[3][i][5]
       }
     );
   }
