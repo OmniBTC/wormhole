@@ -41,7 +41,6 @@ export async function run(ph: PromHelper) {
   let typedFilters = await getBackend().listener.getEmitterFilters();
   const wrappedFilters = { filters: typedFilters };
   // Must after getEmitterFilters to init emitChainIdToAddress
-  await getUnProcessSwap();
 
   await wormholeAppInit();
 
