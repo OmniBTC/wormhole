@@ -1,10 +1,10 @@
 import * as fs from "fs";
 import { ethers } from "ethers";
 import { newProvider } from "../relayer/evm";
-import { getLogger } from "./logHelper";
+import { getScopedLogger } from "./logHelper";
 import { ChainId, hexToUint8Array } from "@certusone/wormhole-sdk";
 
-let logger = getLogger();
+const logger = getScopedLogger(["serdeHelper"]);
 
 export function leftPaddingAddress(addr: string): string {
   let normalAddr = addr.replace("0x", "");

@@ -1,12 +1,12 @@
 import axios from "axios";
-import { getLogger } from "../helpers/logHelper";
 import { findVaaInMongo, VAAStorage } from "../helpers/mongoHelper";
 import { leftPaddingAddress } from "../helpers/serdeHelper";
 import { emitChainIdToAddress } from "../backends/default/listener";
+import { getScopedLogger } from "../helpers/logHelper";
 
-const logger = getLogger();
 
 export async function getUnProcessSwap(): Promise<VAAStorage[]> {
+  const logger = getScopedLogger(["getUnProcessSwap"]);
   const result = await axios.get("https://crossswap-pre.coming.chat/v1/getUnSendTransferFromWormhole");
   let output: VAAStorage[] = [];
   try {
@@ -14,7 +14,10 @@ export async function getUnProcessSwap(): Promise<VAAStorage[]> {
       try {
         const srcWormholeChainId = result.data.record[i].srcWormholeChainId;
         const sequence = result.data.record[i].dstWormholeChainId;
-        let emitterAddress = emitChainIdToAddress[srcWormholeChainId];
+        const emitterAddress = emitChainIdToAddress[srcWormholeChainId];
+        if (!emitterAddress) {
+          continue;
+        }
         const item = await findVaaInMongo(srcWormholeChainId, leftPaddingAddress(emitterAddress), sequence.toString());
         if (item != null) {
           const now = new Date().getTime();
