@@ -172,9 +172,9 @@ const createListenerEnvironment: () => ListenerEnvironment = () => {
       array.forEach((filter: any) => {
         if (filter.chainId && filter.emitterAddress) {
           logger.info(
-            "nativeToHexString: " +
-            nativeToHexString(filter.emitterAddress, filter.chainId)
-          );
+            "nativeToHexString: " + filter.emitterAddress + " " + filter.chainId
+        )
+          ;
           spyServiceFilters.push({
             chainId: filter.chainId as ChainId,
             emitterAddress: filter.emitterAddress
