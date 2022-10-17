@@ -172,8 +172,8 @@ export type WormholePayload = {
 
 export async function parseWormholePayload(transferPayload: Uint8Array): Promise<WormholePayload> {
   let result = await wormholeFacet.decodeWormholePayload(transferPayload);
-  const dstMaxGas = result[0];
-  const dstMaxGasPrice = result[1];
+  const dstMaxGasPrice = result[0];
+  const dstMaxGas = result[1];
   const soData: NormalizedSoData = {
     transactionId: result[2][0],
     receiver: result[2][1],

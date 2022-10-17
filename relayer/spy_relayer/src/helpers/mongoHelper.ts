@@ -3,6 +3,7 @@ import { getListenerEnvironment } from "../configureEnv";
 import { getScopedLogger } from "./logHelper";
 import { parseVAA, VAA } from "./serdeHelper";
 import { ChainId, uint8ArrayToHex } from "@certusone/wormhole-sdk";
+import { BigNumber } from "ethers";
 
 const logger = getScopedLogger(["Mongo"]);
 
@@ -12,13 +13,20 @@ export const mongoClient = new MongoClient(mongoUrl);
 
 export const wormholeDB = mongoClient.db("Wormhole");
 
-
 export interface VAAStorage extends VAA {
   hexString: string;
 }
 
-export const vaaCol = wormholeDB.collection<VAAStorage>("VAAStorage");
+export interface RelayerDstGas {
+  chainId: ChainId;
+  estimateGas: BigInt;
+  estimateGasPrice: BigInt;
+  actualGas: BigNumber;
+  actualGasPrice: BigNumber;
+}
 
+export const vaaCol = wormholeDB.collection<VAAStorage>("VAAStorage");
+export const dstGasCol = wormholeDB.collection<RelayerDstGas>("RelayerDstGas");
 
 export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
   try {
@@ -27,9 +35,8 @@ export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
       {
         sequence: vaa.sequence,
         emitterChainId: vaa.emitterChainId,
-        emitterAddress: vaa.emitterAddress
-      }
-      ,
+        emitterAddress: vaa.emitterAddress,
+      },
       {
         $set: {
           version: vaa.version,
@@ -43,15 +50,20 @@ export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
           sequence: vaa.sequence,
           signatures: vaa.signatures,
           timestamp: vaa.timestamp,
-          hexString: uint8ArrayToHex(rawVaa)
-        }
+          hexString: uint8ArrayToHex(rawVaa),
+        },
       },
       { upsert: true }
     );
-    logger.info("Add vaa to mongo, sequence: " + vaa.sequence +
-      " emitterAddress: " + vaa.emitterAddress +
-      " emitterChainId: " + vaa.emitterChainId +
-      " hash: " + vaa.hash
+    logger.info(
+      "Add vaa to mongo, sequence: " +
+        vaa.sequence +
+        " emitterAddress: " +
+        vaa.emitterAddress +
+        " emitterChainId: " +
+        vaa.emitterChainId +
+        " hash: " +
+        vaa.hash
     );
     return vaa;
   } catch (e) {
@@ -66,25 +78,73 @@ export async function findVaaInMongo(
   sequence: string
 ): Promise<VAAStorage | null> {
   try {
-    return await vaaCol.findOne<VAAStorage>(
-      {
-        sequence: sequence,
-        emitterChainId: emitterChainId,
-        emitterAddress: emitterAddress
-      }
-    );
+    return await vaaCol.findOne<VAAStorage>({
+      sequence: sequence,
+      emitterChainId: emitterChainId,
+      emitterAddress: emitterAddress,
+    });
   } catch (e) {
-    logger.error("Find " +
-      emitterChainId + ", " +
-      emitterAddress + ", " +
-      sequence + " fail: ", e
+    logger.error(
+      "Find " +
+        emitterChainId +
+        ", " +
+        emitterAddress +
+        ", " +
+        sequence +
+        " fail: ",
+      e
     );
   }
   return null;
 }
 
-export async function addGasInMongo(_gasVaa: Uint8Array) {
-//  todo! add estimateGas estimateGasPrice actualGas actualGasPrice
+export async function addDstGasInMongo(
+  relayerDstGas: RelayerDstGas
+): Promise<RelayerDstGas | null> {
+  if (
+    relayerDstGas.estimateGas === BigInt(0) ||
+    relayerDstGas.estimateGasPrice === BigInt(0)
+  ) {
+    logger.warn("Estimated relayer dst gas or gas price is 0.");
+    return null;
+  }
+  try {
+    await dstGasCol.insertOne({
+      chainId: relayerDstGas.chainId,
+      estimateGas: relayerDstGas.estimateGas,
+      estimateGasPrice: relayerDstGas.estimateGasPrice,
+      actualGas: relayerDstGas.actualGas,
+      actualGasPrice: relayerDstGas.actualGasPrice,
+    });
+    logger.info(
+      "Add dst gas to mongo, chainId: " +
+        relayerDstGas.chainId +
+        " estimateGas: " +
+        relayerDstGas.estimateGas +
+        " estimateGasPrice: " +
+        relayerDstGas.estimateGasPrice +
+        " actualGas: " +
+        relayerDstGas.actualGas +
+        " actualGasPrice: " +
+        relayerDstGas.actualGasPrice
+    );
+  } catch (e) {
+    logger.error("Add relayer dst gas to mongo fail: ", e);
+  }
+  return null;
 }
 
-
+export async function findDstGasInMongo(
+  chainId: ChainId
+): Promise<RelayerDstGas[] | null> {
+  try {
+    return await dstGasCol
+      .find<RelayerDstGas>({
+        chainId: { $eq: chainId },
+      })
+      .toArray();
+  } catch (e) {
+    logger.error("Find " + chainId + " dst gas fail: ", e);
+  }
+  return null;
+}

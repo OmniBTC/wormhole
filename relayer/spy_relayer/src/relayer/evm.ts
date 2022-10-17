@@ -7,14 +7,23 @@ import {
   CHAIN_ID_POLYGON,
   ChainId,
   getIsTransferCompletedEth,
-  hexToUint8Array
+  hexToUint8Array,
 } from "@certusone/wormhole-sdk";
 import { ethers } from "ethers";
-import { ChainConfigInfo, getListenerEnvironment, getRelayerEnvironment } from "../configureEnv";
+import {
+  ChainConfigInfo,
+  getListenerEnvironment,
+  getRelayerEnvironment,
+} from "../configureEnv";
 import { getScopedLogger, ScopedLogger } from "../helpers/logHelper";
 import { PromHelper } from "../helpers/promHelpers";
 import { CeloProvider, CeloWallet } from "@celo-tools/celo-ethers-wrapper";
-import { leftPaddingAddress, parseVAAToWormholePayload } from "../helpers/serdeHelper";
+import {
+  leftPaddingAddress,
+  parseVAAToWormholePayload,
+  WormholePayload,
+} from "../helpers/serdeHelper";
+import { addDstGasInMongo } from "../helpers/mongoHelper";
 
 function getChainConfigInfo(chainId: ChainId) {
   const env = getRelayerEnvironment();
@@ -47,9 +56,7 @@ export async function processTransfer(
   if (!chainConfigInfo) {
     return;
   }
-  const logger = getScopedLogger(
-    ["evm", chainConfigInfo.chainName]
-  );
+  const logger = getScopedLogger(["evm", chainConfigInfo.chainName]);
 
   const signedVaaArray = hexToUint8Array(signedVAA);
   let provider = undefined;
@@ -70,7 +77,10 @@ export async function processTransfer(
     }
   });
   if (diamondAddress == "") {
-    logger.error("Not found diamond address for chainid: ", chainConfigInfo.chainId);
+    logger.error(
+      "Not found diamond address for chainid: ",
+      chainConfigInfo.chainId
+    );
   }
 
   logger.debug("Checking to see if vaa has already been redeemed.");
@@ -108,7 +118,7 @@ export async function processTransfer(
     let feeData = await provider.getFeeData();
     overrides = {
       maxFeePerGas: feeData.maxFeePerGas?.mul(50) || undefined,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.mul(50) || undefined
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.mul(50) || undefined,
     };
   } else if (
     chainConfigInfo.chainId === CHAIN_ID_KLAYTN ||
@@ -118,17 +128,31 @@ export async function processTransfer(
     overrides = { gasPrice: (await signer.getGasPrice()).toString() };
   }
 
+  let estimateMaxGas = undefined;
+  let estimateGasPrice = undefined;
   try {
-    const { transferPayload, wormholePayload } = await parseVAAToWormholePayload(signedVaaArray);
-    logger.info("In wormholePayload estimateMaxGasPrice: " + wormholePayload.dstMaxGasPrice
-      + " estimateMaxGas: " + wormholePayload.dstMaxGas);
-    if (wormholePayload.dstMaxGasPrice.toString() != "0") {
-      overrides = { gasPrice: wormholePayload.dstMaxGasPrice.toString() };
-    }
-    const p1 = leftPaddingAddress(diamondAddress);
+    const { transferPayload, wormholePayload } =
+      await parseVAAToWormholePayload(signedVaaArray);
+    estimateMaxGas = wormholePayload.dstMaxGas;
+    estimateGasPrice = wormholePayload.dstMaxGasPrice;
+    logger.info(
+      "In wormholePayload estimateMaxGas: " +
+        estimateMaxGas +
+        " estimateMaxGasPrice: " +
+        estimateGasPrice
+    );
+    // if (wormholePayload.dstMaxGasPrice.toString() != "0") {
+    //   overrides = { gasPrice: wormholePayload.dstMaxGasPrice.toString() };
+    // }
+    const p1 = leftPaddingAddress(diamondAddress.toLowerCase());
     const p2 = leftPaddingAddress(transferPayload.to);
     if (transferPayload.toChain != dstChainId) {
-      logger.error("toChain: " + transferPayload.toChain + " not match dstChainId: " + dstChainId);
+      logger.error(
+        "toChain: " +
+          transferPayload.toChain +
+          " not match dstChainId: " +
+          dstChainId
+      );
     }
     if (diamondAddress != "" && p1 != p2) {
       logger.error("DiamondAddress: " + p1 + " not match to: " + p2);
@@ -152,6 +176,21 @@ export async function processTransfer(
   // The auditor worker should confirm that our tx was successful
   const success = true;
 
+  await addDstGasInMongo({
+    chainId: chainConfigInfo.chainId,
+    estimateGas: estimateMaxGas !== undefined ? estimateMaxGas : BigInt(0),
+    estimateGasPrice:
+      estimateGasPrice !== undefined ? estimateGasPrice : BigInt(0),
+    actualGas: receipt.gasUsed,
+    actualGasPrice: receipt.effectiveGasPrice,
+  });
+
+  logger.info(
+    "tx gas used: %d, tx cumulativeGasUsed: %d, tx effective gas price: %d",
+    receipt.gasUsed,
+    receipt.cumulativeGasUsed,
+    receipt.effectiveGasPrice
+  );
   if (provider instanceof ethers.providers.WebSocketProvider) {
     await provider.destroy();
   }
@@ -169,7 +208,13 @@ export async function relayEVM(
   relayLogger: ScopedLogger,
   metrics: PromHelper
 ) {
-  const result = await processTransfer(chainConfigInfo.chainId, signedVAA, unwrapNative, checkOnly, walletPrivateKey);
+  const result = await processTransfer(
+    chainConfigInfo.chainId,
+    signedVAA,
+    unwrapNative,
+    checkOnly,
+    walletPrivateKey
+  );
 
   metrics.incSuccesses(chainConfigInfo.chainId);
   return result;
