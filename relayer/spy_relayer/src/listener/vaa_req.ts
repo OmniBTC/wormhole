@@ -9,8 +9,9 @@ export async function wormholeAppInit() {
   const logger = getScopedLogger(["wormholeAppInit"]);
   wormholeApp.use(express.json());
 
-  wormholeApp.listen(5066, "localhost", () => {
-    logger.info(`Wormhole Rpc Service start up: localhost:5066`);
+  let rpc_port = process.env.RPC_PORT ? parseInt(process.env.RPC_PORT) : 5066;
+  wormholeApp.listen(rpc_port, "localhost", () => {
+    logger.info(`Wormhole Rpc Service start up: localhost:${rpc_port}`);
   });
 
   wormholeApp.post("*", async function (req, res) {

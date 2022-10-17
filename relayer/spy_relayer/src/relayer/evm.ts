@@ -130,16 +130,20 @@ export async function processTransfer(
 
   let estimateMaxGas = undefined;
   let estimateGasPrice = undefined;
+  let dstSwapLength = 0;
   try {
     const { transferPayload, wormholePayload } =
       await parseVAAToWormholePayload(signedVaaArray);
     estimateMaxGas = wormholePayload.dstMaxGas;
     estimateGasPrice = wormholePayload.dstMaxGasPrice;
+    dstSwapLength = wormholePayload.dstSwapData.length;
     logger.info(
       "In wormholePayload estimateMaxGas: " +
         estimateMaxGas +
         " estimateMaxGasPrice: " +
-        estimateGasPrice
+        estimateGasPrice +
+        " dstSwapLength: " +
+        dstSwapLength
     );
     // if (wormholePayload.dstMaxGasPrice.toString() != "0") {
     //   overrides = { gasPrice: wormholePayload.dstMaxGasPrice.toString() };
@@ -178,6 +182,8 @@ export async function processTransfer(
 
   await addDstGasInMongo({
     chainId: chainConfigInfo.chainId,
+    vaaLength: signedVaaArray.length,
+    dstSwapLength: dstSwapLength,
     estimateGas: estimateMaxGas !== undefined ? estimateMaxGas : BigInt(0),
     estimateGasPrice:
       estimateGasPrice !== undefined ? estimateGasPrice : BigInt(0),

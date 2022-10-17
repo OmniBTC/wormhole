@@ -19,6 +19,8 @@ export interface VAAStorage extends VAA {
 
 export interface RelayerDstGas {
   chainId: ChainId;
+  vaaLength: number;
+  dstSwapLength: number;
   estimateGas: BigInt;
   estimateGasPrice: BigInt;
   actualGas: BigNumber;
@@ -111,6 +113,8 @@ export async function addDstGasInMongo(
   try {
     await dstGasCol.insertOne({
       chainId: relayerDstGas.chainId,
+      vaaLength: relayerDstGas.vaaLength,
+      dstSwapLength: relayerDstGas.dstSwapLength,
       estimateGas: relayerDstGas.estimateGas,
       estimateGasPrice: relayerDstGas.estimateGasPrice,
       actualGas: relayerDstGas.actualGas,
