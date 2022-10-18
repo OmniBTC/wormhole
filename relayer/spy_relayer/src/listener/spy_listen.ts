@@ -1,4 +1,7 @@
-import { createSpyRPCServiceClient, subscribeSignedVAA } from "@certusone/wormhole-spydk";
+import {
+  createSpyRPCServiceClient,
+  subscribeSignedVAA,
+} from "@certusone/wormhole-spydk";
 import { getBackend } from "../backends";
 import { getListenerEnvironment, ListenerEnvironment } from "../configureEnv";
 import { getLogger } from "../helpers/logHelper";
@@ -34,8 +37,8 @@ export async function run(ph: PromHelper) {
   logger.info("Attempting to run Listener...");
   logger.info(
     "spy_relay starting up, will listen for signed VAAs from [" +
-    env.spyServiceHost +
-    "]"
+      env.spyServiceHost +
+      "]"
   );
 
   let typedFilters = await getBackend().listener.getEmitterFilters();
@@ -73,7 +76,21 @@ export async function run(ph: PromHelper) {
       );
 
       while (connected) {
-        await sleep(1000);
+        try {
+          logger.info("Check for transactions that require compensation... ");
+          const needCompensate = await getUnProcessSwap();
+          for (let i = 0; i < needCompensate.length; i++) {
+            const asUint8 = hexToUint8Array(needCompensate[i].hexString);
+            await getBackend().listener.process(asUint8);
+          }
+        } catch (e: any) {
+          if (e.message) {
+            logger.error("Failed to relay compensated vaa: %s", e.message);
+          } else {
+            logger.error("Failed to relay compensated vaa: %o", e);
+          }
+        }
+        await sleep(60 * 1000);
       }
     } catch (e) {
       logger.error("spy service threw an exception: %o", e);

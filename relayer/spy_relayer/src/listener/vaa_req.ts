@@ -25,8 +25,8 @@ export async function wormholeAppInit() {
         );
         let result = await findVaaInMongo(
           req.body.params[0],
-          leftPaddingAddress(req.body.params[1]),
-          req.body.params[2].toString()
+          req.body.params[1].toString(),
+          leftPaddingAddress(req.body.params[2])
         );
         res.send(JSON.stringify(result));
       } else if (req.body.method == "GetDstGas") {

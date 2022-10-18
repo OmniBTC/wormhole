@@ -75,11 +75,14 @@ export async function addVaaInMongo(rawVaa: Uint8Array): Promise<VAA | null> {
 }
 
 export async function findVaaInMongo(
+  sequence: string,
   emitterChainId: ChainId,
-  emitterAddress: string,
-  sequence: string
+  emitterAddress: string
 ): Promise<VAAStorage | null> {
   try {
+    // logger.debug(
+    //   `Find vaa --> sequence:[${sequence}], emitterChainId:[${emitterChainId}] emitterAddress:[${emitterAddress}]`
+    // );
     return await vaaCol.findOne<VAAStorage>({
       sequence: sequence,
       emitterChainId: emitterChainId,
@@ -123,6 +126,10 @@ export async function addDstGasInMongo(
     logger.info(
       "Add dst gas to mongo, chainId: " +
         relayerDstGas.chainId +
+        " vaaLength: " +
+        relayerDstGas.vaaLength +
+        " dstSwapLength: " +
+        relayerDstGas.dstSwapLength +
         " estimateGas: " +
         relayerDstGas.estimateGas +
         " estimateGasPrice: " +

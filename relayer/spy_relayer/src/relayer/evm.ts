@@ -110,10 +110,7 @@ export async function processTransfer(
   logger.debug("Redeeming.");
   let overrides = {};
 
-  if (
-    chainConfigInfo.chainId === CHAIN_ID_POLYGON ||
-    chainConfigInfo.chainId === CHAIN_ID_AVAX
-  ) {
+  if (chainConfigInfo.chainId === CHAIN_ID_POLYGON) {
     // look, there's something janky with Polygon + ethers + EIP-1559
     let feeData = await provider.getFeeData();
     overrides = {

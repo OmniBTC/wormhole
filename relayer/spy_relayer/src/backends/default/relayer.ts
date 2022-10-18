@@ -7,7 +7,7 @@ import {
   isEVMChain,
   isTerraChain,
   parseTransferPayload,
-  tryHexToNativeString
+  tryHexToNativeString,
 } from "@certusone/wormhole-sdk";
 
 import { AUDIT_INTERVAL_MS, REDIS_RETRY_MS, Relayer } from "../definitions";
@@ -21,7 +21,7 @@ import {
   StorePayload,
   storePayloadFromJson,
   storePayloadToJson,
-  WorkerInfo
+  WorkerInfo,
 } from "../../helpers/redisHelper";
 import { PromHelper } from "../../helpers/promHelpers";
 import { sleep } from "../../helpers/utils";
@@ -85,17 +85,6 @@ export class TokenBridgeRelayer implements Relayer {
           metrics
         );
 
-        const needCompensate = await getUnProcessSwap();
-        for (let i = 0; i < needCompensate.length; i++) {
-          await this.relay(
-            needCompensate[i].hexString,
-            false,
-            privateKey,
-            logger,
-            metrics
-          );
-        }
-
         logger.info("Relay returned: %o", Status[relayResult.status]);
       } catch (e: any) {
         if (e.message) {
@@ -106,7 +95,7 @@ export class TokenBridgeRelayer implements Relayer {
 
         relayResult = {
           status: Status.Error,
-          result: e && e?.message !== undefined ? e.message : "Failure"
+          result: e && e?.message !== undefined ? e.message : "Failure",
         };
       }
 
@@ -119,8 +108,7 @@ export class TokenBridgeRelayer implements Relayer {
           Buffer.from(parsedVAA.payload)
         );
         targetChain = transferPayload.targetChain;
-      } catch (e) {
-      }
+      } catch (e) {}
       let retry: boolean = false;
       if (relayResult.status !== Status.Completed) {
         metrics.incFailures(targetChain);
@@ -161,7 +149,7 @@ export class TokenBridgeRelayer implements Relayer {
   /** Run one audit thread per worker so that auditors can not block other auditors or workers */
   async runAuditor(workerInfo: WorkerInfo, metrics: PromHelper): Promise<void> {
     const auditLogger = getScopedLogger([
-      `audit-worker-${workerInfo.targetChainName}-${workerInfo.index}`
+      `audit-worker-${workerInfo.targetChainName}-${workerInfo.index}`,
     ]);
     while (true) {
       try {
@@ -217,11 +205,11 @@ export class TokenBridgeRelayer implements Relayer {
           const TEN_MINUTES = 600000;
           auditLogger.debug(
             "Checking timestamps:  now: " +
-            now.toISOString() +
-            ", old: " +
-            old.toISOString() +
-            ", delta: " +
-            timeDelta
+              now.toISOString() +
+              ", old: " +
+              old.toISOString() +
+              ", delta: " +
+              timeDelta
           );
           if (timeDelta > TEN_MINUTES) {
             // Deal with this item
@@ -242,17 +230,6 @@ export class TokenBridgeRelayer implements Relayer {
                 auditLogger,
                 metrics
               );
-
-              const needCompensate = await getUnProcessSwap();
-              for (let i = 0; i < needCompensate.length; i++) {
-                await this.relay(
-                  needCompensate[i].hexString,
-                  true,
-                  workerInfo.walletPrivateKey,
-                  auditLogger,
-                  metrics
-                );
-              }
 
               await redisClient.del(si_key);
               if (rr.status === Status.Completed) {
@@ -323,7 +300,7 @@ export class TokenBridgeRelayer implements Relayer {
           result:
             "Fatal Error: target chain " +
             transferPayload.targetChain +
-            " not supported"
+            " not supported",
         };
       }
 
@@ -337,24 +314,24 @@ export class TokenBridgeRelayer implements Relayer {
         } catch (e: any) {
           return {
             status: Status.Error,
-            result: `error converting origin address: ${e?.message}`
+            result: `error converting origin address: ${e?.message}`,
           };
         }
         const unwrapNative =
           transferPayload.originChain === transferPayload.targetChain &&
           nativeOrigin?.toLowerCase() ===
-          chainConfigInfo.wrappedAsset?.toLowerCase();
+            chainConfigInfo.wrappedAsset?.toLowerCase();
         const targetAddress = transferPayload.targetAddress;
 
         logger.debug("target address: [" + targetAddress + "]");
 
         logger.debug(
           "isEVMChain: originAddress: [" +
-          transferPayload.originAddress +
-          "], wrappedAsset: [" +
-          chainConfigInfo.wrappedAsset +
-          "], unwrapNative: " +
-          unwrapNative
+            transferPayload.originAddress +
+            "], wrappedAsset: [" +
+            chainConfigInfo.wrappedAsset +
+            "], unwrapNative: " +
+            unwrapNative
         );
         let evmResult = await relayEVM(
           chainConfigInfo,
@@ -369,12 +346,12 @@ export class TokenBridgeRelayer implements Relayer {
         if (evmResult == null) {
           return {
             status: Status.Completed,
-            result: "evmResult is null"
+            result: "evmResult is null",
           };
         } else {
           return {
             status: evmResult.redeemed ? Status.Completed : Status.Error,
-            result: evmResult.result.toString()
+            result: evmResult.result.toString(),
           };
         }
       }
@@ -415,8 +392,8 @@ export class TokenBridgeRelayer implements Relayer {
 
       logger.error(
         "relay: target chain ID: " +
-        transferPayload.targetChain +
-        " is invalid, this is a program bug!"
+          transferPayload.targetChain +
+          " is invalid, this is a program bug!"
       );
 
       return {
@@ -424,7 +401,7 @@ export class TokenBridgeRelayer implements Relayer {
         result:
           "Fatal Error: target chain " +
           transferPayload.targetChain +
-          " is invalid, this is a program bug!"
+          " is invalid, this is a program bug!",
       };
     }
     return { status: Status.FatalError, result: "ERROR: Invalid payload type" };

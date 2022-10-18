@@ -14,12 +14,12 @@ export function leftPaddingAddress(addr: string): string {
   if (!normalAddr.startsWith("0x")) {
     normalAddr = "0x" + normalAddr;
   }
-  return normalAddr;
+  return normalAddr.toLowerCase();
 }
 
 export function readAbi(f: string) {
-  if (fs.existsSync(f)) //判断是否存在此文件
-  {
+  if (fs.existsSync(f)) {
+    //判断是否存在此文件
     //读取文件内容，并转化为Json对象
     let data = JSON.parse(fs.readFileSync(f, "utf8"));
     //获取Json里key为data的数据
@@ -34,10 +34,18 @@ export function readAbi(f: string) {
 const bscMainProvider = newProvider("https://bsc-dataseed1.defibit.io");
 const wormholeAbiFile = "src/abis/Wormhole.json";
 const wormholeAbi = readAbi(wormholeAbiFile);
-export const wormhole = new ethers.Contract("0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B", wormholeAbi, bscMainProvider);
+export const wormhole = new ethers.Contract(
+  "0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B",
+  wormholeAbi,
+  bscMainProvider
+);
 const tokenBridgeAbiFile = "src/abis/TokenBridge.json";
 const tokenBridgeAbi = readAbi(tokenBridgeAbiFile);
-export const tokenBridge = new ethers.Contract("0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7", tokenBridgeAbi, bscMainProvider);
+export const tokenBridge = new ethers.Contract(
+  "0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7",
+  tokenBridgeAbi,
+  bscMainProvider
+);
 
 export type VAA = {
   version: number;
@@ -53,7 +61,7 @@ export type VAA = {
   signatures: any;
 
   hash: string;
-}
+};
 
 export type Transfer = {
   // PayloadID uint8 = 1
@@ -105,11 +113,13 @@ export async function parseVAA(rawVaa: Uint8Array): Promise<VAA> {
     payload: result[7],
     guardianSetIndex: result[8],
     signatures: result[9],
-    hash: result[10]
+    hash: result[10],
   };
 }
 
-export async function parseTransferWithPayload(vaaPayload: Uint8Array): Promise<TransferWithPayload> {
+export async function parseTransferWithPayload(
+  vaaPayload: Uint8Array
+): Promise<TransferWithPayload> {
   let result = await tokenBridge.parseTransferWithPayload(vaaPayload);
   return {
     payloadID: result[0],
@@ -119,7 +129,7 @@ export async function parseTransferWithPayload(vaaPayload: Uint8Array): Promise<
     to: result[4],
     toChain: result[5],
     fromAddress: result[6],
-    payload: result[7]
+    payload: result[7],
   };
 }
 
@@ -132,17 +142,25 @@ export async function parseTransfer(vaaPayload: Uint8Array): Promise<Transfer> {
     tokenChain: result[3],
     to: result[4],
     toChain: result[5],
-    fee: result[6]
+    fee: result[6],
   };
 }
 
 const bscTestProvider = newProvider("https://bsctestapi.terminet.io/rpc");
 const wormholeFacetAbiFile = "src/abis/WormholeFacet.json";
 const wormholeFacetAbi = readAbi(wormholeFacetAbiFile);
-export const wormholeFacet = new ethers.Contract("0xB658abEd5457103f71B065A76A9Ed3C1fD88c591", wormholeFacetAbi, bscTestProvider);
+export const wormholeFacet = new ethers.Contract(
+  "0xB658abEd5457103f71B065A76A9Ed3C1fD88c591",
+  wormholeFacetAbi,
+  bscTestProvider
+);
 const serdeFacetAbiFile = "src/abis/SerdeFacet.json";
 const serdeFacetAbi = readAbi(serdeFacetAbiFile);
-export const serdeFacet = new ethers.Contract("0xFFC1BC8A516C6B0EF5D3a5652a70e722Acf8f9C9", serdeFacetAbi, bscTestProvider);
+export const serdeFacet = new ethers.Contract(
+  "0xFFC1BC8A516C6B0EF5D3a5652a70e722Acf8f9C9",
+  serdeFacetAbi,
+  bscTestProvider
+);
 
 export type NormalizedSoData = {
   transactionId: string;
@@ -167,10 +185,12 @@ export type WormholePayload = {
   dstMaxGas: BigInt;
   dstMaxGasPrice: BigInt;
   soData: NormalizedSoData;
-  dstSwapData: Array<NormalizedSwapData>
+  dstSwapData: Array<NormalizedSwapData>;
 };
 
-export async function parseWormholePayload(transferPayload: Uint8Array): Promise<WormholePayload> {
+export async function parseWormholePayload(
+  transferPayload: Uint8Array
+): Promise<WormholePayload> {
   let result = await wormholeFacet.decodeWormholePayload(transferPayload);
   const dstMaxGasPrice = result[0];
   const dstMaxGas = result[1];
@@ -181,34 +201,40 @@ export async function parseWormholePayload(transferPayload: Uint8Array): Promise
     sendingAssetId: result[2][3],
     destinationChainId: result[2][4],
     receivingAssetId: result[2][5],
-    amount: result[2][6]
+    amount: result[2][6],
   };
   let dstSwapData: Array<NormalizedSwapData> = [];
   for (let i = 0; i < result[3].length; i++) {
-    dstSwapData.push(
-      {
-        callTo: result[3][i][0],
-        approveTo: result[3][i][1],
-        sendingAssetId: result[3][i][2],
-        receivingAssetId: result[3][i][3],
-        fromAmount: result[3][i][4],
-        callData: result[3][i][5]
-      }
-    );
+    dstSwapData.push({
+      callTo: result[3][i][0],
+      approveTo: result[3][i][1],
+      sendingAssetId: result[3][i][2],
+      receivingAssetId: result[3][i][3],
+      fromAmount: result[3][i][4],
+      callData: result[3][i][5],
+    });
   }
   return {
     dstMaxGas,
     dstMaxGasPrice,
     soData,
-    dstSwapData
+    dstSwapData,
   };
 }
 
-export async function parseVAAToWormholePayload(rawVaa: Uint8Array): Promise<{ vaa: VAA, transferPayload: TransferWithPayload, wormholePayload: WormholePayload }> {
+export async function parseVAAToWormholePayload(
+  rawVaa: Uint8Array
+): Promise<{
+  vaa: VAA;
+  transferPayload: TransferWithPayload;
+  wormholePayload: WormholePayload;
+}> {
   const vaa = await parseVAA(rawVaa);
-  const transferPayload = await parseTransferWithPayload(hexToUint8Array(vaa.payload.replace("0x", "")));
-  const wormholePayload = await parseWormholePayload(hexToUint8Array(transferPayload.payload.replace("0x", "")));
+  const transferPayload = await parseTransferWithPayload(
+    hexToUint8Array(vaa.payload.replace("0x", ""))
+  );
+  const wormholePayload = await parseWormholePayload(
+    hexToUint8Array(transferPayload.payload.replace("0x", ""))
+  );
   return { vaa, transferPayload, wormholePayload };
-
 }
-
