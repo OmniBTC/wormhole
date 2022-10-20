@@ -44,7 +44,7 @@ export async function wormholeAppInit() {
           response = JSON.stringify(result);
         }
         res.send(response);
-      }else if (req.body.method == "GetSignedVAAByTo") {
+      } else if (req.body.method == "GetSignedVAAByTo") {
         logger.info(
           `WormholeApp process request: method: ${req.body.method}, params: ${req.body.params}`
         );
@@ -57,18 +57,22 @@ export async function wormholeAppInit() {
             req.body.params[0]
           );
           response = JSON.stringify(result);
-        } else {
-          let result = await findVaaInMongo(
+        } else if (req.body.params.length === 2) {
+          let result = await findVaaByToInMongo(
             req.body.params[0],
             req.body.params[1].toString()
           );
           response = JSON.stringify(result);
+        } else {
+          let result = await findVaaByToInMongo(
+            req.body.params[0],
+            req.body.params[1].toString(),
+            req.body.params[2]
+          );
+          response = JSON.stringify(result);
         }
         res.send(response);
-      }
-
-
-      else if (req.body.method == "GetDstGas") {
+      } else if (req.body.method == "GetDstGas") {
         logger.info(
           `WormholeApp process request: method: ${req.body.method}, params: ${req.body.params}`
         );
