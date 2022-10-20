@@ -28,6 +28,7 @@ import { getEthereumToken } from "../utils/ethereum";
 import { getMultipleAccountsRPC } from "../utils/solana";
 import { formatNativeDenom } from "../utils/terra";
 import { newProvider } from "../relayer/evm";
+import { CHAIN_ID_APTOS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 let env: RelayerEnvironment;
 const logger = getScopedLogger(["walletMonitor"]);
@@ -342,10 +343,15 @@ async function calcLocalAddressesEVM(
       tokenAddressPromises.push(Promise.resolve(supportedToken.address));
       continue;
     }
-    const hexAddress = nativeToHexString(
-      supportedToken.address,
-      supportedToken.chainId
-    );
+    let hexAddress;
+    if (supportedToken.chainId == CHAIN_ID_APTOS){
+      hexAddress = supportedToken.address
+    }else{
+      hexAddress = nativeToHexString(
+        supportedToken.address,
+        supportedToken.chainId
+      );
+    }
     if (!hexAddress) {
       logger.debug(
         "calcLocalAddressesEVM() - no hexAddress for chainId: " +

@@ -25,6 +25,7 @@ import {
   storePayloadToJson
 } from "../../helpers/redisHelper";
 import { addVaaInMongo } from "../../helpers/mongoHelper";
+import { CHAIN_ID_APTOS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 async function encodeEmitterAddress(
   myChainId: ChainId,
@@ -87,10 +88,14 @@ export class TokenBridgeListener implements Listener {
     let originAddressNative: string;
     let env = getListenerEnvironment();
     try {
-      originAddressNative = tryHexToNativeString(
-        payload.originAddress,
-        payload.originChain
-      );
+      if (payload.originChain == CHAIN_ID_APTOS) {
+        originAddressNative = payload.originAddress;
+      } else {
+        originAddressNative = tryHexToNativeString(
+          payload.originAddress,
+          payload.originChain
+        );
+      }
     } catch (e: any) {
       return false;
     }
@@ -205,7 +210,7 @@ export class TokenBridgeListener implements Listener {
           )
         }
       };
-      emitChainIdToAddress[filter.chainId] = filter.emitterAddress
+      emitChainIdToAddress[filter.chainId] = filter.emitterAddress;
       this.logger.info(
         "adding filter: chainId: [" +
         typedFilter.emitterFilter.chainId +

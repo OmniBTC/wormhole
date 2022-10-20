@@ -82,7 +82,6 @@ export async function processTransfer(
       chainConfigInfo.chainId
     );
   }
-
   logger.debug("Checking to see if vaa has already been redeemed.");
   const alreadyRedeemed = await getIsTransferCompletedEth(
     chainConfigInfo.tokenBridgeAddress,

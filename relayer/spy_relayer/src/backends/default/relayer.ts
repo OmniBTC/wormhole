@@ -30,6 +30,7 @@ import { relaySolana } from "../../relayer/solana";
 import { relayEVM } from "../../relayer/evm";
 import { getRelayerEnvironment } from "../../configureEnv";
 import { getUnProcessSwap } from "../../listener/vaa_compensate";
+import { CHAIN_ID_APTOS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 function getChainConfigInfo(chainId: ChainId) {
   const env = getRelayerEnvironment();
@@ -85,7 +86,7 @@ export class TokenBridgeRelayer implements Relayer {
           metrics
         );
 
-        logger.info("Relay returned: %o", Status[relayResult.status]);
+        logger.info("Relay returned: " + Status[relayResult.status] + " error: " + relayResult.result);
       } catch (e: any) {
         if (e.message) {
           logger.error("Failed to relay transfer vaa: %s", e.message);
@@ -307,10 +308,14 @@ export class TokenBridgeRelayer implements Relayer {
       if (isEVMChain(transferPayload.targetChain)) {
         let nativeOrigin: string;
         try {
-          nativeOrigin = tryHexToNativeString(
-            transferPayload.originAddress,
-            transferPayload.originChain
-          );
+          if (transferPayload.originChain == CHAIN_ID_APTOS){
+            nativeOrigin = transferPayload.originAddress;
+          }else{
+            nativeOrigin = tryHexToNativeString(
+              transferPayload.originAddress,
+              transferPayload.originChain
+            );
+          }
         } catch (e: any) {
           return {
             status: Status.Error,
