@@ -10,7 +10,13 @@ export async function wormholeAppInit() {
   wormholeApp.use(express.json());
 
   let rpc_port = process.env.RPC_PORT ? parseInt(process.env.RPC_PORT) : 5066;
-  wormholeApp.listen(rpc_port, "localhost", () => {
+  let rpc_host;
+  if (process.env.RPC_PORT != null){
+    rpc_host = process.env.RPC_PORT.toString()
+  }else{
+    rpc_host = "0.0.0.0"
+  }
+  wormholeApp.listen(rpc_port, rpc_host, () => {
     logger.info(`Wormhole Rpc Service start up: localhost:${rpc_port}`);
   });
 
