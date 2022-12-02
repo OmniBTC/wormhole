@@ -66,7 +66,7 @@ module wormhole::state {
     //
     // Only one State ever exists, because only the init function creates a State object
     fun init(ctx: &mut TxContext) {
-        transfer::transfer(State {
+        transfer::share_object(State {
             id: object::new(ctx),
             chain_id: u16::from_u64(0),
             governance_chain_id: u16::from_u64(0),
@@ -77,27 +77,24 @@ module wormhole::state {
             consumed_governance_actions: vec_set::empty<vector<u8>>(),
             emitter_registry: emitter::init_emitter_registry(),
             message_fee: 0,
-        }, tx_context::sender(ctx));
+        });
     }
 
     // converts owned state object into a shared object, so that anyone can get a reference to &mut State
     // and pass it into various functions
-    public entry fun init_and_share_state(
-        state: State,
+    public entry fun init_governance(
+        state: &mut State,
         chain_id: u64,
         governance_chain_id: u64,
         governance_contract: vector<u8>,
         initial_guardian: vector<u8>,
         _ctx: &mut TxContext
     ) {
-        set_chain_id(&mut state, chain_id);
-        set_governance_chain_id(&mut state, governance_chain_id);
-        set_governance_contract(&mut state, governance_contract);
+        set_chain_id(state, chain_id);
+        set_governance_chain_id(state, governance_chain_id);
+        set_governance_contract(state, governance_contract);
         let initial_guardian = vector[structs::create_guardian(initial_guardian)];
-        store_guardian_set(&mut state, u32::from_u64(0), structs::create_guardian_set(u32::from_u64(0), initial_guardian));
-
-        // permanently shares state
-        transfer::share_object(state);
+        store_guardian_set(state, u32::from_u64(0), structs::create_guardian_set(u32::from_u64(0), initial_guardian));
     }
 
     #[test_only]
