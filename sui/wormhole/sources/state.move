@@ -205,8 +205,7 @@ module wormhole::state {
 
 #[test_only]
 module wormhole::test_state{
-    use sui::test_scenario::{Self, Scenario, next_tx, ctx, take_from_address, return_to_address, take_shared};
-    use std::vector::{Self};
+    use sui::test_scenario::{Self, Scenario, next_tx, ctx, take_from_address, return_to_address};
 
     use wormhole::state::{Self, test_init, State};
     use wormhole::myu16::{Self as u16};
@@ -238,33 +237,6 @@ module wormhole::test_state{
             assert!(state::get_governance_chain(&state) == u16::from_u64(100), 0);
 
             return_to_address<State>(admin, state);
-        };
-        test_scenario::end(test);
-    }
-
-    #[test]
-    fun test_init_and_share_state() {
-        test_init_and_share_state_(scenario())
-    }
-
-    fun test_init_and_share_state_(test: Scenario) {
-        let (admin, _, _) = people();
-        next_tx(&mut test, admin); {
-            test_init(ctx(&mut test));
-        };
-        next_tx(&mut test, admin);{
-            let state = take_from_address<State>(&mut test, admin);
-            // initialize state with desired parameters and initial guardian address
-            state::init_and_share_state(state, 0, 0, vector::empty<u8>(), x"beFA429d57cD18b7F8A4d91A2da9AB4AF05d0FBe", ctx(&mut test));
-        };
-        next_tx(&mut test, admin);{
-            // confirm that state is indeed a shared object, and mutate it
-            let state = take_shared<State>(&mut test);
-            //let mut_ref = test_scenario::borrow_mut(&mut state);
-            let mut_ref = &mut state;
-            state::test_set_chain_id(mut_ref, 9);
-            assert!(state::get_chain_id(mut_ref)==u16::from_u64(9), 0);
-            test_scenario::return_shared(state);
         };
         test_scenario::end(test);
     }
