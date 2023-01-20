@@ -3,8 +3,8 @@ name = "Wormhole"
 version = "0.0.1"
 
 [dependencies]
-# sui v0.21.0
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "2d709054a08d904b9229a2472af679f210af3827" }
+# sui v0.22.0
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "e3e28e09ffb7943aa4b46b65e12b630ef36161ef" }
 
 [addresses]
 wormhole = "0x0"
