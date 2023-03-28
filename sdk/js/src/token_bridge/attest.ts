@@ -7,7 +7,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import { MsgExecuteContract } from "@terra-money/terra.js";
-import { MsgExecuteContract as MsgExecuteContractInjective } from "@injectivelabs/sdk-ts";
+import { MsgExecuteContractCompat as MsgExecuteContractInjective } from "@injectivelabs/sdk-ts";
 import {
   Algodv2,
   bigIntToBytes,
@@ -97,19 +97,21 @@ export async function attestFromInjective(
   return MsgExecuteContractInjective.fromJSON({
     contractAddress: tokenBridgeAddress,
     sender: walletAddress,
-    msg: {
-      asset_info: isNativeAsset
-        ? {
-            native_token: { denom: asset },
-          }
-        : {
-            token: {
-              contract_addr: asset,
+    exec: {
+      msg: {
+        asset_info: isNativeAsset
+          ? {
+              native_token: { denom: asset },
+            }
+          : {
+              token: {
+                contract_addr: asset,
+              },
             },
-          },
-      nonce: nonce,
+        nonce: nonce,
+      },
+      action: "create_asset_meta",
     },
-    action: "create_asset_meta",
   });
 }
 

@@ -29,8 +29,8 @@ type (
 		aptosAccount string
 		aptosHandle  string
 
-		msgChan  chan *common.MessagePublication
-		obsvReqC chan *gossipv1.ObservationRequest
+		msgC     chan<- *common.MessagePublication
+		obsvReqC <-chan *gossipv1.ObservationRequest
 	}
 )
 
@@ -52,14 +52,14 @@ func NewWatcher(
 	aptosRPC string,
 	aptosAccount string,
 	aptosHandle string,
-	messageEvents chan *common.MessagePublication,
-	obsvReqC chan *gossipv1.ObservationRequest,
+	msgC chan<- *common.MessagePublication,
+	obsvReqC <-chan *gossipv1.ObservationRequest,
 ) *Watcher {
 	return &Watcher{
 		aptosRPC:     aptosRPC,
 		aptosAccount: aptosAccount,
 		aptosHandle:  aptosHandle,
-		msgChan:      messageEvents,
+		msgC:         msgC,
 		obsvReqC:     obsvReqC,
 	}
 }
@@ -208,7 +208,8 @@ func (e *Watcher) Run(ctx context.Context) error {
 
 			}
 
-			logger.Info(string(health) + string(eventsJson))
+			// TODO: Make this log more useful for humans
+			logger.Debug(string(health) + string(eventsJson))
 
 			pHealth := gjson.ParseBytes(health)
 
@@ -317,5 +318,5 @@ func (e *Watcher) observeData(logger *zap.Logger, data gjson.Result, nativeSeq u
 		zap.Uint8("consistencyLevel", observation.ConsistencyLevel),
 	)
 
-	e.msgChan <- observation
+	e.msgC <- observation
 }

@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.9.10
+
+## Added
+
+Aptos NFT bridge support
+
+## 0.9.9
+
+## Changed
+
+Use BN.toArrayLike for compatibility with browserify and similar tools in `tokenIdToMint` function
+
+## 0.9.8
+
+## Changed
+
+Use BN.toArrayLike for compatibility with browserify and similar tools
+
+## 0.9.7
+
+## Added
+
+solana instruction decoder
+
+## 0.9.6
+
+## Changed
+
+injective dependencies updated
+
+solana token bridge cpi account fixes
+
+solana account and instruction serialization fixes
+
+## 0.9.5
+
+### Added
+
+injective mainnet addresses
+
+## 0.9.4
+
+## Changed
+
+Neon testnet addresses
+
 ## 0.9.3
 
 Fix `transferFromSolana`, `transferNativeSol` and `redeemOnSolana` for Token Bridge.

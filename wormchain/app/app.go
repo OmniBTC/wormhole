@@ -69,14 +69,14 @@ import (
 	upgradeclient "github.com/cosmos/cosmos-sdk/x/upgrade/client"
 	upgradekeeper "github.com/cosmos/cosmos-sdk/x/upgrade/keeper"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	"github.com/cosmos/ibc-go/v3/modules/apps/transfer"
-	ibctransferkeeper "github.com/cosmos/ibc-go/v3/modules/apps/transfer/keeper"
-	ibctransfertypes "github.com/cosmos/ibc-go/v3/modules/apps/transfer/types"
-	ibc "github.com/cosmos/ibc-go/v3/modules/core"
-	ibcclient "github.com/cosmos/ibc-go/v3/modules/core/02-client"
-	ibcporttypes "github.com/cosmos/ibc-go/v3/modules/core/05-port/types"
-	ibchost "github.com/cosmos/ibc-go/v3/modules/core/24-host"
-	ibckeeper "github.com/cosmos/ibc-go/v3/modules/core/keeper"
+	transfer "github.com/cosmos/ibc-go/v4/modules/apps/transfer"
+	ibctransferkeeper "github.com/cosmos/ibc-go/v4/modules/apps/transfer/keeper"
+	ibctransfertypes "github.com/cosmos/ibc-go/v4/modules/apps/transfer/types"
+	ibc "github.com/cosmos/ibc-go/v4/modules/core"
+	ibcclient "github.com/cosmos/ibc-go/v4/modules/core/02-client"
+	ibcporttypes "github.com/cosmos/ibc-go/v4/modules/core/05-port/types"
+	ibchost "github.com/cosmos/ibc-go/v4/modules/core/24-host"
+	ibckeeper "github.com/cosmos/ibc-go/v4/modules/core/keeper"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cast"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -93,6 +93,7 @@ import (
 
 	"github.com/wormhole-foundation/wormchain/docs"
 	wormholemodule "github.com/wormhole-foundation/wormchain/x/wormhole"
+	wormholemoduleante "github.com/wormhole-foundation/wormchain/x/wormhole/ante"
 	wormholeclient "github.com/wormhole-foundation/wormchain/x/wormhole/client"
 	wormholemodulekeeper "github.com/wormhole-foundation/wormchain/x/wormhole/keeper"
 	wormholemoduletypes "github.com/wormhole-foundation/wormchain/x/wormhole/types"
@@ -124,11 +125,14 @@ func getGovProposalHandlers() []govclient.ProposalHandler {
 }
 
 // GetWasmOpts build wasm options
-func GetWasmOpts(appOpts servertypes.AppOptions) []wasm.Option {
+func GetWasmOpts(app *App, appOpts servertypes.AppOptions) []wasm.Option {
 	var wasmOpts []wasm.Option
 	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
 		wasmOpts = append(wasmOpts, wasmkeeper.WithVMCacheMetrics(prometheus.DefaultRegisterer))
 	}
+
+	// add the custom wormhole query handler
+	wasmOpts = append(wasmOpts, wasmkeeper.WithQueryPlugins(wormholemodulekeeper.NewCustomQueryHandler(app.WormholeKeeper)))
 
 	return wasmOpts
 }
@@ -316,8 +320,6 @@ func New(
 		app.BankKeeper,
 	)
 
-	wormholeModule := wormholemodule.NewAppModule(appCodec, app.WormholeKeeper)
-
 	stakingKeeper := stakingkeeper.NewKeeper(
 		appCodec, keys[stakingtypes.StoreKey], app.AccountKeeper, app.BankKeeper, app.WormholeKeeper, app.GetSubspace(stakingtypes.ModuleName),
 	)
@@ -385,7 +387,7 @@ func New(
 
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
-	supportedFeatures := "iterator,staking,stargate"
+	supportedFeatures := "iterator,staking,stargate,wormhole"
 	wasmDir := filepath.Join(homePath, "data")
 	// Instantiate wasm keeper with stubs for other modules as we do not need
 	// wasm to be able to write to other modules.
@@ -407,10 +409,12 @@ func New(
 		wasm.DefaultWasmConfig(),
 		// wasmConfig.ToWasmConfig(),
 		supportedFeatures,
-		GetWasmOpts(appOpts)...,
+		GetWasmOpts(app, appOpts)...,
 	)
 	permissionedWasmKeeper := wasmkeeper.NewDefaultPermissionKeeper(app.wasmKeeper)
 	app.WormholeKeeper.SetWasmdKeeper(permissionedWasmKeeper)
+	// the wormhole module must be instantiated after the wasmd module
+	wormholeModule := wormholemodule.NewAppModule(appCodec, app.WormholeKeeper)
 
 	// this line is used by starport scaffolding # stargate/app/keeperDefinition
 
@@ -549,7 +553,7 @@ func New(
 	app.SetInitChainer(app.InitChainer)
 	app.SetBeginBlocker(app.BeginBlocker)
 
-	anteHandler, err := ante.NewAnteHandler(
+	anteHandlerSdk, err := ante.NewAnteHandler(
 		ante.HandlerOptions{
 			AccountKeeper:   app.AccountKeeper,
 			BankKeeper:      app.BankKeeper,
@@ -561,8 +565,9 @@ func New(
 	if err != nil {
 		panic(err)
 	}
+	wrappedAnteHandler := WrapAnteHandler(anteHandlerSdk, app.WormholeKeeper)
 
-	app.SetAnteHandler(anteHandler)
+	app.SetAnteHandler(wrappedAnteHandler)
 	app.SetEndBlocker(app.EndBlocker)
 
 	if loadLatest {
@@ -577,6 +582,20 @@ func New(
 	app.scopedWasmKeeper = scopedWasmKeeper
 
 	return app
+}
+
+// Wrap the standard cosmos-sdk antehandlers with our wormhole allowlist antehandler.
+func WrapAnteHandler(originalHandler sdk.AnteHandler, wormKeeper wormholemodulekeeper.Keeper) sdk.AnteHandler {
+	whHandler := wormholemoduleante.NewWormholeAllowlistDecorator(wormKeeper)
+	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		newCtx, err := originalHandler(ctx, tx, simulate)
+		if err != nil {
+			return newCtx, err
+		}
+		return whHandler.AnteHandle(newCtx, tx, simulate, func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+			return ctx, nil
+		})
+	}
 }
 
 // Name returns the name of the App

@@ -37,7 +37,7 @@ import {
   callFunctionNear,
   hashLookup,
 } from "../utils";
-import { MsgExecuteContract as MsgExecuteContractInjective } from "@injectivelabs/sdk-ts";
+import { MsgExecuteContractCompat as MsgExecuteContractInjective } from "@injectivelabs/sdk-ts";
 import {
   createCompleteTransferNativeInstruction,
   createCompleteTransferWrappedInstruction,
@@ -101,10 +101,12 @@ export async function submitVAAOnInjective(
   return MsgExecuteContractInjective.fromJSON({
     contractAddress: tokenBridgeAddress,
     sender: walletAddress,
-    msg: {
-      data: fromUint8Array(signedVAA),
+    exec: {
+      msg: {
+        data: fromUint8Array(signedVAA),
+      },
+      action: "submit_vaa",
     },
-    action: "submit_vaa",
   });
 }
 export const redeemOnInjective = submitVAAOnInjective;

@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - dev.v2
+      - main
 jobs:
   # Run the full Tilt build and wait for it to converge
   tilt:
@@ -122,12 +122,16 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.version }}
           components: "clippy,rustfmt"
 
-      - name: Cache rust packages
+      - name: Cache rust packages / build cache
         uses: actions/cache@v3
         env:
           cache-name: solana-rust-packages
         with:
-          path: ~/.cargo/registry
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            solana/target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('solana/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
@@ -200,6 +204,20 @@ jobs:
       - name: Run tests via docker
         run: make test-docker
 
+  sui:
+    name: Sui
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./sui
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Run tests via docker
+        run: make test-docker
+
   terra:
     runs-on: ubuntu-20.04
     steps:
@@ -209,6 +227,14 @@ jobs:
           node-version: "16"
       - run: cd terra && make test
   terra-2:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+      - run: cd cosmwasm/deployment/terra2 && make test
+  cosmwasm:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -234,11 +260,24 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "1.19.3"
-      - run: curl https://get.ignite.com/cli@v0.23.0 | bash && mv ignite /usr/local/bin/
-      - run: cd wormchain && make proto -B && make test
+      - run: |
+          cd wormchain
+          make proto -B
+          git diff --name-only --exit-code && echo "✅ Generated proto matches committed proto" || (echo "❌ Generated proto differs from committed proto, run \`make proto -B\` and commit the result" >&2 && exit 1)
+          make test
 
-  # Run Go linters, Go tests and other outside-of-Tilt things.
-  lint-and-tests:
+  # Verify go sdk unit tests
+  sdk_vaa:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.19.3"
+      - run: cd sdk/vaa && go test
+
+  # Run Go linters
+  node-lint:
     # The linter is slow enough that we want to run it on the self-hosted runner
     runs-on: tilt-kube-public
     concurrency:
@@ -260,15 +299,30 @@ jobs:
         run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.46.2
       - name: Run linters
         run: make generate && ./scripts/lint.sh -g lint
-
-      # The go-ethereum and celo-blockchain packages both implement secp256k1 using the exact same header, but that causes duplicate symbols.
-      - name: Run golang tests
-        run: cd node && go test -v -race -ldflags '-extldflags "-Wl,--allow-multiple-definition" ' ./...
       - name: Ensure generated proto matches
         run: |
           rm -rf node/pkg/proto
           docker build --target go-export -f Dockerfile.proto -o type=local,dest=node .
           git diff --name-only --exit-code && echo "✅ Generated proto matches committed proto" || (echo "❌ Generated proto differs from committed proto, run \`rm -rf node/pkg/proto && docker build --target go-export -f Dockerfile.proto -o type=local,dest=node .\` and commit the result" >&2 && exit 1)
+
+  # Run Go tests
+  node-tests:
+    # The tests are slow enough that we want to run it on the self-hosted runner
+    runs-on: tilt-kube-public
+    concurrency:
+      group: ${{ github.workflow }}-test-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Clear repository
+        run: |
+          rm -rf $GITHUB_WORKSPACE && mkdir $GITHUB_WORKSPACE
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.19.3"
+      # The go-ethereum and celo-blockchain packages both implement secp256k1 using the exact same header, but that causes duplicate symbols.
+      - name: Run golang tests
+        run: cd node && go test -v -race -ldflags '-extldflags "-Wl,--allow-multiple-definition" ' ./...
 
   # Run Rust lints and tests
   rust-lint-and-tests:

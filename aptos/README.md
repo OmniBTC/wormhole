@@ -11,6 +11,7 @@ The project is laid out as follows:
 
 - [wormhole](./wormhole) the core messaging layer
 - [token_bridge](./token_bridge) the asset transfer layer
+- [nft_bridge](./nft_bridge) NFT transfer layer
 - [examples](./examples) various example contracts
 
 To see a minimal example of how to integrate with wormhole, check out
@@ -124,13 +125,14 @@ run the deploy script again. However, a better way is to run one of the followin
 ``` sh
 scripts $ ./upgrade devnet Core # for upgrading the wormhole contract
 scripts $ ./upgrade devnet TokenBridge # for upgarding the token bridge contract
+scripts $ ./upgrade devnet NFTBridge # for upgarding the NFT bridge contract
 ```
 
 Behind the scenes, these scripts exercise the whole contract upgrade code path
 (see below), including generating and verifying a signed governance action, and
 the Move bytecode verifier checking ABI compatibility. If an upgrade here fails
 due to incompatibility, it will likely on mainnet too. (TODO: add CI action to
-simulate upgrades against dev.v2 when there's a stable version)
+simulate upgrades against main when there's a stable version)
 
 # Implementation notes / coding practices
 

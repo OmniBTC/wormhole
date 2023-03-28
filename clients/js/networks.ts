@@ -86,8 +86,9 @@ const MAINNET = {
       "85957f38de1768d6db9eab29bee9dd2a01462aff9c8d83daefb9bcd2506c32d2",
   },
   injective: {
-    rpc: undefined,
-    key: undefined,
+    rpc: "http://sentry0.injective.network:26657",
+    chain_id: "injective-1",
+    key: get_env_var("INJECTIVE_KEY"),
   },
   osmosis: {
     rpc: undefined,
@@ -228,8 +229,8 @@ const TESTNET = {
     key: get_env_var("APTOS_TESTNET"),
   },
   sui: {
-    rpc: undefined,
-    key: undefined,
+    rpc: "https://fullnode.devnet.sui.io:443",
+    key: get_env_var("SUI_KEY_TESTNET"),
   },
   pythnet: {
     rpc: "https://api.pythtest.pyth.network/",
@@ -259,7 +260,7 @@ const TESTNET = {
   terra2: {
     rpc: "https://pisco-lcd.terra.dev",
     chain_id: "pisco-1",
-    key: get_env_var("TERRA_MNEMONIC"),
+    key: get_env_var("TERRA_MNEMONIC_TESTNET"),
   },
   arbitrum: {
     rpc: "https://goerli-rollup.arbitrum.io/rpc",
@@ -374,8 +375,8 @@ const DEVNET = {
     key: "537c1f91e56891445b491068f519b705f8c0f1a1e66111816dd5d4aa85b8113d",
   },
   sui: {
-    rpc: undefined,
-    key: undefined,
+    rpc: "http://0.0.0.0:9000",
+    key: "AIGosn9itp74Z+M7LQpkwy5JCNjIBYh88rypgh5kfdU3",
   },
   moonbeam: {
     rpc: undefined,

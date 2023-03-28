@@ -66,6 +66,8 @@ export async function execute_solana(
             vaa
           );
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on solana")
         default:
           ix = impossible(v.payload);
       }
@@ -84,6 +86,8 @@ export async function execute_solana(
             vaa
           );
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on solana")
         case "RegisterChain":
           console.log("Registering chain");
           ix = createNFTBridgeRegisterChainInstruction(
@@ -115,6 +119,8 @@ export async function execute_solana(
             vaa
           );
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on solana")
         case "RegisterChain":
           console.log("Registering chain");
           ix = createTokenBridgeRegisterChainInstruction(
@@ -172,7 +178,6 @@ export async function execute_solana(
     bridgeId,
     from.publicKey,
     vaa,
-    5
   );
 
   // Then do the actual thing

@@ -28,7 +28,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/tidwall/gjson"
 	"github.com/wormhole-foundation/wormhole/sdk/vaa"
 	"go.uber.org/zap"
 )
@@ -95,6 +94,15 @@ type (
 		} `json:"result"`
 		ID int `json:"id"`
 	}
+
+	SuiCommitteeInfo struct {
+		Jsonrpc string `json:"jsonrpc"`
+		Result  struct {
+			Epoch         int             `json:"epoch"`
+			CommitteeInfo [][]interface{} `json:"committee_info"`
+		} `json:"result"`
+		ID int `json:"id"`
+	}
 )
 
 var (
@@ -154,13 +162,13 @@ func (e *Watcher) inspectBody(logger *zap.Logger, body SuiResult) error {
 	}
 
 	if e.suiAccount != *moveEvent.Sender {
-		logger.Info("account missmatch", zap.String("e.suiAccount", e.suiAccount), zap.String("account", *moveEvent.Sender))
-		return errors.New("account missmatch")
+		logger.Info("account mismatch", zap.String("e.suiAccount", e.suiAccount), zap.String("account", *moveEvent.Sender))
+		return errors.New("account mismatch")
 	}
 
 	if !e.unsafeDevMode && e.suiPackage != *moveEvent.PackageID {
-		logger.Info("package missmatch", zap.String("e.suiPackage", e.suiPackage), zap.String("package", *moveEvent.PackageID))
-		return errors.New("package missmatch")
+		logger.Info("package mismatch", zap.String("e.suiPackage", e.suiPackage), zap.String("package", *moveEvent.PackageID))
+		return errors.New("package mismatch")
 	}
 
 	emitter := make([]byte, 8)
@@ -306,14 +314,14 @@ func (e *Watcher) Run(ctx context.Context) error {
 
 			resp, err := http.Post(e.suiRPC, "application/json", strings.NewReader(buf))
 			if err != nil {
-				logger.Error(e.suiRPC, zap.Error(err))
+				logger.Error("getEvents API failed", zap.String("suiRPC", e.suiRPC), zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
 				continue
 			}
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				logger.Error(e.suiRPC, zap.Error(err))
+				logger.Error("unexpected truncated body when calling getEvents", zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
 				continue
 
@@ -325,7 +333,7 @@ func (e *Watcher) Run(ctx context.Context) error {
 			var res SuiTxnQuery
 			err = json.Unmarshal(body, &res)
 			if err != nil {
-				logger.Error(e.suiRPC, zap.Error(err))
+				logger.Error("failed to unmarshal event message", zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
 				continue
 
@@ -334,9 +342,8 @@ func (e *Watcher) Run(ctx context.Context) error {
 			for _, chunk := range res.Result.Data {
 				err := e.inspectBody(logger, chunk)
 				if err != nil {
-					logger.Error(e.suiRPC, zap.Error(err))
+					logger.Error("unspected error while parsing chunk data in event", zap.Error(err))
 				}
-
 			}
 		case msg := <-pumpData:
 			logger.Info("receive", zap.String("body", string(msg)))
@@ -344,7 +351,7 @@ func (e *Watcher) Run(ctx context.Context) error {
 			var res SuiEventMsg
 			err = json.Unmarshal(msg, &res)
 			if err != nil {
-				logger.Error("Unmarshal", zap.String("body", string(msg)), zap.Error(err))
+				logger.Error("Failed to unmarshal SuiEventMsg", zap.String("body", string(msg)), zap.Error(err))
 				continue
 			}
 			if res.Error != nil {
@@ -353,7 +360,7 @@ func (e *Watcher) Run(ctx context.Context) error {
 			}
 			if res.ID != nil {
 				if *res.ID == e.subId {
-					logger.Info("Subscribed set to true")
+					logger.Debug("Subscribed set to true")
 					e.subscribed = true
 				}
 				continue
@@ -370,37 +377,38 @@ func (e *Watcher) Run(ctx context.Context) error {
 		case <-timer.C:
 			resp, err := http.Post(e.suiRPC, "application/json", strings.NewReader(`{"jsonrpc":"2.0", "id": 1, "method": "sui_getCommitteeInfo", "params": []}`))
 			if err != nil {
-				logger.Error(fmt.Sprintf("sui_getCommitteeInfo: %s", err.Error()))
+				logger.Error("sui_getCommitteeInfo failed", zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
 				break
 
 			}
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				logger.Error(fmt.Sprintf("sui_getCommitteeInfo: %s", err.Error()))
+				logger.Error("sui_getCommitteeInfo failed", zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
 				break
-
 			}
 			resp.Body.Close()
-			if !gjson.Valid(string(body)) {
-				logger.Error("sui_getCommitteeInfo: " + string(body))
+
+			var res SuiCommitteeInfo
+			err = json.Unmarshal(body, &res)
+			if err != nil {
+				logger.Error("unmarshal failed into SuiCommitteeInfo", zap.String("body", string(body)), zap.Error(err))
 				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
-				break
+				continue
+
 			}
-			epoch := gjson.ParseBytes(body).Get("result.epoch")
-			if !epoch.Exists() {
-				logger.Error("sui_getCommitteeInfo: " + string(body))
-				p2p.DefaultRegistry.AddErrorCount(vaa.ChainIDSui, 1)
-				break
-			}
-			// Epoch is currently not ticking in 0.15.0.  They also
+
+			// curl -s -X POST -d '{"jsonrpc":"2.0", "id": 1, "method": "sui_getLatestCheckpointSequenceNumber", "params": []}' -H 'Content-Type: application/json' http://127.0.0.1:9000
+			// Epoch is currently not ticking in 0.16.0.  They also
 			// might release another API that gives a
 			// proper block height as we traditionally
 			// understand it...
-			currentSuiHeight.Set(float64(epoch.Uint()))
+			currentSuiHeight.Set(float64(res.Result.Epoch))
+			logger.Error(fmt.Sprintf("sui_getCommitteeInfo: %d", res.Result.Epoch))
+
 			p2p.DefaultRegistry.SetNetworkStats(vaa.ChainIDSui, &gossipv1.Heartbeat_Network{
-				Height:          int64(epoch.Uint()),
+				Height:          int64(res.Result.Epoch),
 				ContractAddress: e.suiAccount,
 			})
 

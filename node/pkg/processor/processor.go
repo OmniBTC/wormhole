@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"
 
+	"github.com/certusone/wormhole/node/pkg/accountant"
 	"github.com/certusone/wormhole/node/pkg/common"
 	gossipv1 "github.com/certusone/wormhole/node/pkg/proto/gossip/v1"
 	"github.com/certusone/wormhole/node/pkg/reporter"
@@ -80,13 +81,12 @@ type PythNetVaaEntry struct {
 }
 
 type Processor struct {
-	// lockC is a channel of observed emitted messages
-	lockC chan *common.MessagePublication
+	// msgC is a channel of observed emitted messages
+	msgC <-chan *common.MessagePublication
 	// setC is a channel of guardian set updates
-	setC chan *common.GuardianSet
-
-	// sendC is a channel of outbound messages to broadcast on p2p
-	sendC chan []byte
+	setC <-chan *common.GuardianSet
+	// gossipSendC is a channel of outbound messages to broadcast on p2p
+	gossipSendC chan<- []byte
 	// obsvC is a channel of inbound decoded observations from p2p
 	obsvC chan *gossipv1.SignedObservation
 
@@ -94,10 +94,10 @@ type Processor struct {
 	obsvReqSendC chan<- *gossipv1.ObservationRequest
 
 	// signedInC is a channel of inbound signed VAA observations from p2p
-	signedInC chan *gossipv1.SignedVAAWithQuorum
+	signedInC <-chan *gossipv1.SignedVAAWithQuorum
 
 	// injectC is a channel of VAAs injected locally.
-	injectC chan *vaa.VAA
+	injectC <-chan *vaa.VAA
 
 	// gk is the node's guardian private key
 	gk *ecdsa.PrivateKey
@@ -132,19 +132,21 @@ type Processor struct {
 
 	notifier    *discord.DiscordNotifier
 	governor    *governor.ChainGovernor
+	acct        *accountant.Accountant
+	acctReadC   <-chan *common.MessagePublication
 	pythnetVaas map[string]PythNetVaaEntry
 }
 
 func NewProcessor(
 	ctx context.Context,
 	db *db.Database,
-	lockC chan *common.MessagePublication,
-	setC chan *common.GuardianSet,
-	sendC chan []byte,
+	msgC <-chan *common.MessagePublication,
+	setC <-chan *common.GuardianSet,
+	gossipSendC chan<- []byte,
 	obsvC chan *gossipv1.SignedObservation,
 	obsvReqSendC chan<- *gossipv1.ObservationRequest,
-	injectC chan *vaa.VAA,
-	signedInC chan *gossipv1.SignedVAAWithQuorum,
+	injectC <-chan *vaa.VAA,
+	signedInC <-chan *gossipv1.SignedVAAWithQuorum,
 	gk *ecdsa.PrivateKey,
 	gst *common.GuardianSetState,
 	devnetMode bool,
@@ -154,12 +156,14 @@ func NewProcessor(
 	attestationEvents *reporter.AttestationEventReporter,
 	notifier *discord.DiscordNotifier,
 	g *governor.ChainGovernor,
+	acct *accountant.Accountant,
+	acctReadC <-chan *common.MessagePublication,
 ) *Processor {
 
 	return &Processor{
-		lockC:              lockC,
+		msgC:               msgC,
 		setC:               setC,
-		sendC:              sendC,
+		gossipSendC:        gossipSendC,
 		obsvC:              obsvC,
 		obsvReqSendC:       obsvReqSendC,
 		signedInC:          signedInC,
@@ -181,6 +185,8 @@ func NewProcessor(
 		state:       &aggregationState{observationMap{}},
 		ourAddr:     crypto.PubkeyToAddress(gk.PublicKey),
 		governor:    g,
+		acct:        acct,
+		acctReadC:   acctReadC,
 		pythnetVaas: make(map[string]PythNetVaaEntry),
 	}
 }
@@ -194,17 +200,35 @@ func (p *Processor) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			if p.acct != nil {
+				p.acct.Close()
+			}
 			return ctx.Err()
 		case p.gs = <-p.setC:
 			p.logger.Info("guardian set updated",
 				zap.Strings("set", p.gs.KeysAsHexStrings()),
 				zap.Uint32("index", p.gs.Index))
 			p.gst.Set(p.gs)
-		case k := <-p.lockC:
+		case k := <-p.msgC:
 			if p.governor != nil {
 				if !p.governor.ProcessMsg(k) {
 					continue
 				}
+			}
+			if p.acct != nil {
+				shouldPub, err := p.acct.SubmitObservation(k)
+				if err != nil {
+					return fmt.Errorf("acct: failed to process message `%s`: %w", k.MessageIDString(), err)
+				}
+				if !shouldPub {
+					continue
+				}
+			}
+			p.handleMessage(ctx, k)
+
+		case k := <-p.acctReadC:
+			if p.acct == nil {
+				return fmt.Errorf("acct: received an accountant event when accountant is not configured")
 			}
 			p.handleMessage(ctx, k)
 		case v := <-p.injectC:
@@ -223,9 +247,26 @@ func (p *Processor) Run(ctx context.Context) error {
 				}
 				if len(toBePublished) != 0 {
 					for _, k := range toBePublished {
+						// SECURITY defense-in-depth: Make sure the governor did not generate an unexpected message.
+						if msgIsGoverned, err := p.governor.IsGovernedMsg(k); err != nil {
+							return fmt.Errorf("cgov: governor failed to determine if message should be governed: `%s`: %w", k.MessageIDString(), err)
+						} else if !msgIsGoverned {
+							return fmt.Errorf("cgov: governor published a message that should not be governed: `%s`", k.MessageIDString())
+						}
+						if p.acct != nil {
+							shouldPub, err := p.acct.SubmitObservation(k)
+							if err != nil {
+								return fmt.Errorf("acct: failed to process message released by governor `%s`: %w", k.MessageIDString(), err)
+							}
+							if !shouldPub {
+								continue
+							}
+						}
 						p.handleMessage(ctx, k)
 					}
 				}
+			}
+			if (p.governor != nil) || (p.acct != nil) {
 				govTimer = time.NewTimer(time.Minute)
 			}
 		}

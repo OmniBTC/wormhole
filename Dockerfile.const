@@ -17,7 +17,7 @@ COPY clients/js/package.json clients/js/package-lock.json ./
 # mount the buildkit cache on npm's cache dir, install dependencies
 
 # Commenting out npm cache due to heisenbug with github build machines
-# RUN --mount=type=cache,uid=1000,gid=1000,target=/home/node/.npm 
+# RUN --mount=type=cache,uid=1000,gid=1000,target=/home/node/.npm
 
 RUN npm ci
 
@@ -34,6 +34,9 @@ COPY ethereum/.env.test ./ethereum/.env.test
 ARG num_guardians
 ENV NUM_GUARDIANS=$num_guardians
 
+# run distribute-devnet-consts.sh to copy devnet-consts.json to chain dirs for use
+RUN ./scripts/distribute-devnet-consts.sh
+
 # run guardian-set-init.sh to create env files with the init state for NUM_GUARDIANS
 RUN ./scripts/guardian-set-init.sh $NUM_GUARDIANS
 
@@ -41,7 +44,10 @@ FROM scratch AS const-export
 COPY --from=const-build /scripts/.env.0x ethereum/.env
 COPY --from=const-build /scripts/.env.hex solana/.env
 COPY --from=const-build /scripts/.env.hex terra/tools/.env
-COPY --from=const-build /scripts/.env.hex cosmwasm/tools/.env
+COPY --from=const-build /scripts/.env.hex cosmwasm/deployment/terra2/tools/.env
 COPY --from=const-build /scripts/.env.hex algorand/.env
 COPY --from=const-build /scripts/.env.hex near/.env
 COPY --from=const-build /scripts/.env.hex aptos/.env
+COPY --from=const-build /scripts/.env.hex wormchain/contracts/tools/.env
+
+COPY --from=const-build /scripts/devnet-consts.json wormchain/contracts/tools/

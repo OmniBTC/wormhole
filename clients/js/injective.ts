@@ -1,12 +1,12 @@
 import { getNetworkInfo, Network } from "@injectivelabs/networks";
+import { getStdFee, DEFAULT_STD_FEE } from "@injectivelabs/utils";
 import {
-  MsgExecuteContract,
-  DEFAULT_STD_FEE,
-  privateKeyToPublicKeyBase64,
-  ChainRestAuthApi,
   PrivateKey,
+  TxGrpcApi,
+  ChainRestAuthApi,
+  createTransaction,
+  MsgExecuteContract,
 } from "@injectivelabs/sdk-ts";
-import { createTransaction, MsgArg, TxGrpcClient } from "@injectivelabs/tx-ts";
 import { fromUint8Array } from "js-base64";
 import { impossible, Payload } from "./vaa";
 import { NETWORKS } from "./networks";
@@ -31,11 +31,9 @@ export async function execute_injective(
 
   const network = getNetworkInfo(endPoint);
   const walletPKHash = n.key;
-  const walletPK = PrivateKey.fromPrivateKey(walletPKHash);
+  const walletPK = PrivateKey.fromMnemonic(walletPKHash);
   const walletInjAddr = walletPK.toBech32();
-  const walletPublicKey = privateKeyToPublicKeyBase64(
-    Buffer.from(walletPKHash, "hex")
-  );
+  const walletPublicKey = walletPK.toPublicKey().toBase64();
 
   let target_contract: string;
   let action: string;
@@ -57,6 +55,8 @@ export async function execute_injective(
         case "ContractUpgrade":
           console.log("Upgrading core contract");
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on injective")
         default:
           impossible(payload);
       }
@@ -79,6 +79,8 @@ export async function execute_injective(
         case "ContractUpgrade":
           console.log("Upgrading contract");
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on injective")
         case "RegisterChain":
           console.log("Registering chain");
           break;
@@ -105,6 +107,8 @@ export async function execute_injective(
         case "ContractUpgrade":
           console.log("Upgrading contract");
           break;
+        case "RecoverChainId":
+          throw new Error("RecoverChainId not supported on injective")
         case "RegisterChain":
           console.log("Registering chain");
           break;
@@ -130,20 +134,22 @@ export async function execute_injective(
   const transaction = MsgExecuteContract.fromJSON({
     sender: walletInjAddr,
     contractAddress: target_contract,
-    msg: {
-      ...execute_msg[action],
+    exec: {
+      action,
+      msg: {
+        ...execute_msg[action],
+      },
     },
-    action,
   });
   console.log("transaction:", transaction);
 
-  const accountDetails = await new ChainRestAuthApi(
-    network.sentryHttpApi
-  ).fetchAccount(walletInjAddr);
+  const accountDetails = await new ChainRestAuthApi(network.rest).fetchAccount(
+    walletInjAddr
+  );
   const { signBytes, txRaw } = createTransaction({
     message: transaction.toDirectSign(),
     memo: "",
-    fee: DEFAULT_STD_FEE,
+    fee: getStdFee((parseInt(DEFAULT_STD_FEE.gas, 10) * 2.5).toString()),
     pubKey: walletPublicKey,
     sequence: parseInt(accountDetails.account.base_account.sequence, 10),
     accountNumber: parseInt(
@@ -161,7 +167,7 @@ export async function execute_injective(
   /** Append Signatures */
   txRaw.setSignaturesList([sig]);
 
-  const txService = new TxGrpcClient(network.sentryGrpcApi);
+  const txService = new TxGrpcApi(network.grpc);
 
   console.log("simulate transaction...");
   /** Simulate transaction */
@@ -186,7 +192,7 @@ export async function execute_injective(
     console.log(`Transaction failed: ${txResponse.rawLog}`);
   } else {
     console.log(
-      `Broadcasted transaction hash: ${JSON.stringify(txResponse.txhash)}`
+      `Broadcasted transaction hash: ${JSON.stringify(txResponse.txHash)}`
     );
   }
 }

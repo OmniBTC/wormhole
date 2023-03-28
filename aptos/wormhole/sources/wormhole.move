@@ -114,7 +114,7 @@ module wormhole::wormhole {
         // performs aptos coin registration too, so it's possible that this is
         // already performed, in which case we just skip
         // (thanks ottersec for point this out)
-        if (!coin::is_account_registered<AptosCoin>(signer::address_of(&wormhole))){
+        if (!coin::is_account_registered<AptosCoin>(signer::address_of(&wormhole))) {
             coin::register<AptosCoin>(&wormhole);
         };
     }
@@ -194,7 +194,7 @@ module wormhole::wormhole_test {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x0)]
+    #[expected_failure(abort_code = 0x0, location = wormhole::wormhole)]
     public fun test_publish_message_insufficient_fee() {
         setup(100);
         let emitter_cap = wormhole::register_emitter();

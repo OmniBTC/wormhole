@@ -1,15 +1,13 @@
+import { assertChain, CHAIN_ID_APTOS, CHAIN_ID_SOLANA, coalesceChainId, CONTRACTS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 import { BCS, FaucetClient } from "aptos";
-import { ethers } from "ethers";
-import yargs from "yargs";
-import { callEntryFunc, deriveResourceAccount, deriveWrappedAssetAddress } from "../aptos";
 import { spawnSync } from 'child_process';
-import { config } from '../config';
 import fs from 'fs';
 import sha3 from 'js-sha3';
+import yargs from "yargs";
+import { callEntryFunc, deriveResourceAccount, deriveWrappedAssetAddress } from "../aptos";
+import { NETWORK_OPTIONS, RPC_OPTIONS, NAMED_ADDRESSES_OPTIONS } from "../consts";
 import { NETWORKS } from "../networks";
-import { assertChain, CHAIN_ID_APTOS, CHAIN_ID_SOLANA, coalesceChainId } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
-
-type Network = "MAINNET" | "TESTNET" | "DEVNET"
+import { assertNetwork, checkBinary, evm_address, hex } from "../utils";
 
 interface Package {
   meta_file: string,
@@ -22,64 +20,28 @@ interface PackageBCS {
   codeHash: Uint8Array
 }
 
-const network_options = {
-  alias: "n",
-  describe: "network",
-  type: "string",
-  choices: ["mainnet", "testnet", "devnet"],
-  required: true,
-} as const;
-
-const rpc_description = {
-  alias: "r",
-  describe: "override default rpc endpoint url",
-  type: "string",
-  required: false,
-} as const;
-
-const named_addresses = {
-  describe: "named addresses in the format addr1=0x0,addr2=0x1,...",
-  type: "string",
-  require: false
-} as const;
-
-// TODO(csongor): this could be useful elsewhere
-function assertNetwork(n: string): asserts n is Network {
-  if (
-    n !== "MAINNET" &&
-    n !== "TESTNET" &&
-    n !== "DEVNET"
-  ) {
-    throw Error(`Unknown network: ${n}`);
-  }
-}
-
 exports.command = 'aptos';
-exports.desc = 'Aptos utilities ';
+exports.desc = 'Aptos utilities';
 exports.builder = function(y: typeof yargs) {
   return y
+  // NOTE: there's no init-nft-bridge, because the native module initialiser
+  // functionality has stabilised on mainnet, so we just use that one (which
+  // gets called automatically)
     .command("init-token-bridge", "Init token bridge contract", (yargs) => {
       return yargs
-        .option("network", network_options)
-        .option("rpc", rpc_description)
-        // TODO(csongor): once the sdk has this, just use it from there
-        .option("contract-address", {
-          alias: "a",
-          required: true,
-          describe: "Address where the wormhole module is deployed",
-          type: "string",
-        })
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
-      const contract_address = evm_address(argv["contract-address"]);
+      const contract_address = evm_address(CONTRACTS[network].aptos.token_bridge);
       const rpc = argv.rpc ?? NETWORKS[network]["aptos"].rpc;
       await callEntryFunc(network, rpc, `${contract_address}::token_bridge`, "init", [], []);
     })
     .command("init-wormhole", "Init Wormhole core contract", (yargs) => {
       return yargs
-        .option("network", network_options)
-        .option("rpc", rpc_description)
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
         .option("chain-id", {
           describe: "Chain id",
           type: "number",
@@ -98,13 +60,6 @@ exports.builder = function(y: typeof yargs) {
           default: "0x0000000000000000000000000000000000000000000000000000000000000004",
           required: false
         })
-        // TODO(csongor): once the sdk has this, just use it from there
-        .option("contract-address", {
-          alias: "a",
-          required: true,
-          describe: "Address where the wormhole module is deployed",
-          type: "string",
-        })
         .option("guardian-address", {
           alias: "g",
           required: true,
@@ -115,7 +70,7 @@ exports.builder = function(y: typeof yargs) {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
 
-      const contract_address = evm_address(argv["contract-address"]);
+      const contract_address = evm_address(CONTRACTS[network].aptos.core);
       const guardian_addresses = argv["guardian-address"].split(",").map(address => evm_address(address).substring(24));
       const chain_id = argv["chain-id"];
       const governance_address = evm_address(argv["governance-address"]);
@@ -139,13 +94,13 @@ exports.builder = function(y: typeof yargs) {
         .positional("package-dir", {
           type: "string"
         })
-        .option("network", network_options)
-        .option("rpc", rpc_description)
-        .option("named-addresses", named_addresses)
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
+        .option("named-addresses", NAMED_ADDRESSES_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
-      checkAptosBinary();
+      checkBinary("aptos", "aptos");
       const p = buildPackage(argv["package-dir"], argv["named-addresses"]);
       const b = serializePackage(p);
       const rpc = argv.rpc ?? NETWORKS[network]["aptos"].rpc;
@@ -160,13 +115,13 @@ exports.builder = function(y: typeof yargs) {
         .positional("package-dir", {
           type: "string"
         })
-        .option("network", network_options)
-        .option("rpc", rpc_description)
-        .option("named-addresses", named_addresses)
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
+        .option("named-addresses", NAMED_ADDRESSES_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
-      checkAptosBinary();
+      checkBinary("aptos", "aptos");
       const p = buildPackage(argv["package-dir"], argv["named-addresses"]);
       const b = serializePackage(p);
       const seed = Buffer.from(argv["seed"], "ascii")
@@ -195,7 +150,7 @@ exports.builder = function(y: typeof yargs) {
         .positional("message", {
           type: "string"
         })
-        .option("network", network_options)
+        .option("network", NETWORK_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
@@ -226,13 +181,16 @@ exports.builder = function(y: typeof yargs) {
         .positional("origin-address", {
           type: "string"
         })
-        .option("network", network_options)
+        .option("network", NETWORK_OPTIONS)
     }, async (argv) => {
-      // TODO(csongor): this should be pulled in from the sdk.
-      let token_bridge_address = Buffer.from("576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f", "hex");
+      const network = argv.network.toUpperCase();
+      assertNetwork(network);
+      let address = CONTRACTS[network].aptos.token_bridge;
+      if (address.startsWith("0x")) address = address.substring(2);
+      const token_bridge_address = Buffer.from(address, "hex");
       assertChain(argv["chain"]);
-      let chain = coalesceChainId(argv["chain"]);
-      let origin_address = Buffer.from(evm_address(argv["origin-address"]), "hex");
+      const chain = coalesceChainId(argv["chain"]);
+      const origin_address = Buffer.from(evm_address(argv["origin-address"]), "hex");
       console.log(deriveWrappedAssetAddress(token_bridge_address, chain, origin_address))
     })
     .command("hash-contracts <package-dir>", "Hash contract bytecodes for upgrade", (yargs) => {
@@ -243,9 +201,9 @@ exports.builder = function(y: typeof yargs) {
         .positional("package-dir", {
           type: "string"
         })
-        .option("named-addresses", named_addresses)
+        .option("named-addresses", NAMED_ADDRESSES_OPTIONS)
     }, (argv) => {
-      checkAptosBinary();
+      checkBinary("aptos", "aptos");
       const p = buildPackage(argv["package-dir"], argv["named-addresses"]);
       const b = serializePackage(p);
       console.log(Buffer.from(b.codeHash).toString("hex"));
@@ -263,13 +221,13 @@ exports.builder = function(y: typeof yargs) {
           describe: "Address where the wormhole module is deployed",
           type: "string",
         })
-        .option("network", network_options)
-        .option("rpc", rpc_description)
-        .option("named-addresses", named_addresses)
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
+        .option("named-addresses", NAMED_ADDRESSES_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
-      checkAptosBinary();
+      checkBinary("aptos", "aptos");
       const p = buildPackage(argv["package-dir"], argv["named-addresses"]);
       const b = serializePackage(p);
       const rpc = argv.rpc ?? NETWORKS[network]["aptos"].rpc;
@@ -297,12 +255,12 @@ exports.builder = function(y: typeof yargs) {
           describe: "Address where the wormhole module is deployed",
           type: "string",
         })
-        .option("network", network_options)
-        .option("rpc", rpc_description)
+        .option("network", NETWORK_OPTIONS)
+        .option("rpc", RPC_OPTIONS)
     }, async (argv) => {
       const network = argv.network.toUpperCase();
       assertNetwork(network);
-      checkAptosBinary();
+      checkBinary("aptos", "aptos");
       const rpc = argv.rpc ?? NETWORKS[network]["aptos"].rpc;
       // TODO(csongor): use deployer address from sdk (when it's there)
       const hash = await callEntryFunc(
@@ -317,17 +275,23 @@ exports.builder = function(y: typeof yargs) {
     // TODO - make faucet support testnet in additional to localnet
     .command("faucet", "Request money from the faucet for a given account", (yargs) => {
       return yargs
-        .option("rpc", rpc_description)
+        .option("rpc", RPC_OPTIONS)
         .option("faucet", {
           alias: "f",
           required: false,
-          describe: "faucet url",
+          describe: "Faucet url",
           type: "string",
+        })
+        .option("amount", {
+          alias: "m",
+          required: false,
+          describe: "Amount to request",
+          type: "number",
         })
         .option("account", {
           alias: "a",
           required: false,
-          describe: "account to fund",
+          describe: "Account to fund",
           type: "string",
         })
     },
@@ -335,6 +299,7 @@ exports.builder = function(y: typeof yargs) {
         let NODE_URL = "http://0.0.0.0:8080/v1";
         let FAUCET_URL = "http://0.0.0.0:8081";
         let account = "0x277fa055b6a73c42c0662d5236c65c864ccbf2d4abd21f174a30c8b786eab84b";
+        let amount = 40000000;
 
         if (argv.faucet != undefined) {
           FAUCET_URL = argv.faucet as string;
@@ -342,32 +307,17 @@ exports.builder = function(y: typeof yargs) {
         if (argv.rpc != undefined) {
           NODE_URL = argv.rpc as string;
         }
+        if (argv.amount != undefined) {
+          amount = argv.amount as number;
+        }
         if (argv.account != undefined) {
           account = argv.account as string;
         }
         const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
-        const coins = 20000000;
-        await faucetClient.fundAccount(account, coins);
-        console.log(`Funded ${account} with ${coins} coins`);
+        await faucetClient.fundAccount(account, amount);
+        console.log(`Funded ${account} with ${amount} coins`);
       })
     .strict().demandCommand();
-}
-
-function hex(x: string): string {
-  return ethers.utils.hexlify(x, { allowMissingPrefix: true });
-}
-function evm_address(x: string): string {
-  return hex(x).substring(2).padStart(64, "0");
-}
-
-export function checkAptosBinary(): void {
-  const dir = `${config.wormholeDir}/aptos`;
-  const aptos = spawnSync("aptos", ["--version"]);
-  if (aptos.status !== 0) {
-    console.error("aptos is not installed. Please install aptos and try again.");
-    console.error(`See ${dir}/README.md for instructions.`);
-    process.exit(1);
-  }
 }
 
 function buildPackage(dir: string, addrs?: string): Package {

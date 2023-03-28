@@ -33,8 +33,8 @@ type (
 		algodToken   string
 		appid        uint64
 
-		msgChan  chan *common.MessagePublication
-		obsvReqC chan *gossipv1.ObservationRequest
+		msgC     chan<- *common.MessagePublication
+		obsvReqC <-chan *gossipv1.ObservationRequest
 
 		next_round uint64
 	}
@@ -60,8 +60,8 @@ func NewWatcher(
 	algodRPC string,
 	algodToken string,
 	appid uint64,
-	lockEvents chan *common.MessagePublication,
-	obsvReqC chan *gossipv1.ObservationRequest,
+	msgC chan<- *common.MessagePublication,
+	obsvReqC <-chan *gossipv1.ObservationRequest,
 ) *Watcher {
 	return &Watcher{
 		indexerRPC:   indexerRPC,
@@ -69,7 +69,7 @@ func NewWatcher(
 		algodRPC:     algodRPC,
 		algodToken:   algodToken,
 		appid:        appid,
-		msgChan:      lockEvents,
+		msgC:         msgC,
 		obsvReqC:     obsvReqC,
 		next_round:   0,
 	}
@@ -137,7 +137,7 @@ func lookAtTxn(e *Watcher, t types.SignedTxnInBlock, b types.Block, logger *zap.
 			zap.Uint8("consistency_level", observation.ConsistencyLevel),
 		)
 
-		e.msgChan <- observation
+		e.msgC <- observation
 	}
 }
 
@@ -176,7 +176,9 @@ func (e *Watcher) Run(ctx context.Context) error {
 		return err
 	}
 
-	e.next_round = status.NextVersionRound
+	e.next_round = status.LastRound + 1
+
+	logger.Info(fmt.Sprintf("first block %d", e.next_round))
 
 	for {
 		select {
@@ -220,9 +222,8 @@ func (e *Watcher) Run(ctx context.Context) error {
 				continue
 			}
 
-			if e.next_round < status.NextVersionRound {
+			if e.next_round <= status.LastRound {
 				for {
-					logger.Info(fmt.Sprintf("inspecting block %d", e.next_round))
 					block, err := algodClient.Block(e.next_round).Do(context.Background())
 					if err != nil {
 						logger.Error(fmt.Sprintf("algodClient.Block %d: %s", e.next_round, err.Error()))
@@ -239,17 +240,18 @@ func (e *Watcher) Run(ctx context.Context) error {
 					}
 					e.next_round = e.next_round + 1
 
-					currentAlgorandHeight.Set(float64(e.next_round))
-					p2p.DefaultRegistry.SetNetworkStats(vaa.ChainIDAlgorand, &gossipv1.Heartbeat_Network{
-						Height:          int64(e.next_round),
-						ContractAddress: fmt.Sprintf("%d", e.appid),
-					})
-
-					if e.next_round == status.NextVersionRound {
+					if e.next_round > status.LastRound {
 						break
 					}
 				}
 			}
+
+			currentAlgorandHeight.Set(float64(status.LastRound))
+			p2p.DefaultRegistry.SetNetworkStats(vaa.ChainIDAlgorand, &gossipv1.Heartbeat_Network{
+				Height:          int64(status.LastRound),
+				ContractAddress: fmt.Sprintf("%d", e.appid),
+			})
+
 			readiness.SetReady(common.ReadinessAlgorandSyncing)
 		}
 	}

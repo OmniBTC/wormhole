@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"encoding/base64"
+	"encoding/json"
+
 	"github.com/certusone/wormhole/node/pkg/common"
 	"github.com/certusone/wormhole/node/pkg/p2p"
 	gossipv1 "github.com/certusone/wormhole/node/pkg/proto/gossip/v1"
@@ -16,34 +19,90 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
+	"github.com/google/uuid"
 	"github.com/mr-tron/base58"
 	"github.com/near/borsh-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/wormhole-foundation/wormhole/sdk/vaa"
 	"go.uber.org/zap"
+	"nhooyr.io/websocket"
 )
 
-type SolanaWatcher struct {
-	contract     solana.PublicKey
-	rpcUrl       string
-	commitment   rpc.CommitmentType
-	messageEvent chan *common.MessagePublication
-	obsvReqC     chan *gossipv1.ObservationRequest
-	rpcClient    *rpc.Client
-	// Readiness component
-	readiness readiness.Component
-	// VAA ChainID of the network we're connecting to.
-	chainID vaa.ChainID
-	// Human readable name of network
-	networkName string
-	// The last slot processed by the watcher.
-	lastSlot uint64
+type (
+	SolanaWatcher struct {
+		contract    solana.PublicKey
+		rawContract string
+		rpcUrl      string
+		wsUrl       *string
+		commitment  rpc.CommitmentType
+		msgC        chan<- *common.MessagePublication
+		obsvReqC    <-chan *gossipv1.ObservationRequest
+		errC        chan error
+		pumpData    chan []byte
+		rpcClient   *rpc.Client
+		// Readiness component
+		readiness readiness.Component
+		// VAA ChainID of the network we're connecting to.
+		chainID vaa.ChainID
+		// Human readable name of network
+		networkName string
+		// The last slot processed by the watcher.
+		lastSlot uint64
+		// subscriber id
+		subId string
 
-	// latestFinalizedBlockNumber is the latest block processed by this watcher.
-	latestBlockNumber   uint64
-	latestBlockNumberMu sync.Mutex
-}
+		// latestFinalizedBlockNumber is the latest block processed by this watcher.
+		latestBlockNumber   uint64
+		latestBlockNumberMu sync.Mutex
+	}
+
+	EventSubscriptionError struct {
+		Jsonrpc string `json:"jsonrpc"`
+		Error   struct {
+			Code    int     `json:"code"`
+			Message *string `json:"message"`
+		} `json:"error"`
+		ID string `json:"id"`
+	}
+
+	EventSubscriptionData struct {
+		Jsonrpc string `json:"jsonrpc"`
+		Method  string `json:"method"`
+		Params  *struct {
+			Result struct {
+				Context struct {
+					Slot int64 `json:"slot"`
+				} `json:"context"`
+				Value struct {
+					Pubkey  string `json:"pubkey"`
+					Account struct {
+						Lamports   int64    `json:"lamports"`
+						Data       []string `json:"data"`
+						Owner      string   `json:"owner"`
+						Executable bool     `json:"executable"`
+						RentEpoch  int64    `json:"rentEpoch"`
+					} `json:"account"`
+				} `json:"value"`
+			} `json:"result"`
+			Subscription int `json:"subscription"`
+		} `json:"params"`
+	}
+
+	MessagePublicationAccount struct {
+		VaaVersion uint8
+		// Borsh does not seem to support booleans, so 0=false / 1=true
+		ConsistencyLevel    uint8
+		VaaTime             uint32
+		VaaSignatureAccount vaa.Address
+		SubmissionTime      uint32
+		Nonce               uint32
+		Sequence            uint64
+		EmitterChain        uint16
+		EmitterAddress      vaa.Address
+		Payload             []byte
+	}
+)
 
 var (
 	solanaConnectionErrors = promauto.NewCounterVec(
@@ -116,23 +175,94 @@ type PostMessageData struct {
 
 func NewSolanaWatcher(
 	rpcUrl string,
+	wsUrl *string,
 	contractAddress solana.PublicKey,
-	messageEvents chan *common.MessagePublication,
-	obsvReqC chan *gossipv1.ObservationRequest,
+	rawContract string,
+	msgC chan<- *common.MessagePublication,
+	obsvReqC <-chan *gossipv1.ObservationRequest,
 	commitment rpc.CommitmentType,
 	readiness readiness.Component,
 	chainID vaa.ChainID) *SolanaWatcher {
 	return &SolanaWatcher{
-		rpcUrl:       rpcUrl,
-		contract:     contractAddress,
-		messageEvent: messageEvents,
-		obsvReqC:     obsvReqC,
-		commitment:   commitment,
-		rpcClient:    rpc.New(rpcUrl),
-		readiness:    readiness,
-		chainID:      chainID,
-		networkName:  vaa.ChainID(chainID).String(),
+		rpcUrl:      rpcUrl,
+		wsUrl:       wsUrl,
+		contract:    contractAddress,
+		rawContract: rawContract,
+		msgC:        msgC,
+		obsvReqC:    obsvReqC,
+		commitment:  commitment,
+		rpcClient:   rpc.New(rpcUrl),
+		readiness:   readiness,
+		chainID:     chainID,
+		networkName: vaa.ChainID(chainID).String(),
 	}
+}
+
+func (s *SolanaWatcher) SetupSubscription(ctx context.Context) (error, *websocket.Conn) {
+	logger := supervisor.Logger(ctx)
+
+	logger.Info("Solana watcher connecting to WS node ", zap.String("url", *s.wsUrl))
+
+	ws, _, err := websocket.Dial(ctx, *s.wsUrl, nil)
+
+	if err != nil {
+		return err, nil
+	}
+
+	s.subId = uuid.New().String()
+
+	s.pumpData = make(chan []byte)
+
+	const temp = `{"jsonrpc": "2.0", "id": "%s", "method": "programSubscribe", "params": ["%s", {"encoding": "base64", "commitment": "%s", "filters": []}]}`
+	var p = fmt.Sprintf(temp, s.subId, s.rawContract, string(s.commitment))
+
+	logger.Info("Subscribing using", zap.String("filter", p))
+
+	if err := ws.Write(ctx, websocket.MessageText, []byte(p)); err != nil {
+		logger.Error(fmt.Sprintf("write: %s", err.Error()))
+		return err, nil
+	}
+	return nil, ws
+}
+
+func (s *SolanaWatcher) SetupWebSocket(ctx context.Context) error {
+	if vaa.ChainID(s.chainID) != vaa.ChainIDPythNet {
+		panic("unsupported chain id")
+	}
+
+	logger := supervisor.Logger(ctx)
+
+	err, ws := s.SetupSubscription(ctx)
+	if err != nil {
+		return err
+	}
+
+	common.RunWithScissors(ctx, s.errC, "SolanaDataPump", func(ctx context.Context) error {
+		defer ws.Close(websocket.StatusNormalClosure, "")
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+				if msg, err := s.readWebSocketWithTimeout(ctx, ws); err != nil {
+					logger.Error(fmt.Sprintf("ReadMessage: '%s'", err.Error()))
+					return err
+				} else {
+					s.pumpData <- msg
+				}
+			}
+		}
+	})
+
+	return nil
+}
+
+func (s *SolanaWatcher) readWebSocketWithTimeout(ctx context.Context, ws *websocket.Conn) ([]byte, error) {
+	rCtx, cancel := context.WithTimeout(ctx, time.Second*300) // 5 minute
+	defer cancel()
+	_, msg, err := ws.Read(rCtx)
+	return msg, err
 }
 
 func (s *SolanaWatcher) Run(ctx context.Context) error {
@@ -143,16 +273,37 @@ func (s *SolanaWatcher) Run(ctx context.Context) error {
 	})
 
 	logger := supervisor.Logger(ctx)
-	errC := make(chan error)
 
-	go func() {
+	logger.Info("Solana watcher connecting to RPC node ", zap.String("url", s.rpcUrl))
+
+	s.errC = make(chan error)
+	s.pumpData = make(chan []byte)
+
+	useWs := false
+	if s.wsUrl != nil && *s.wsUrl != "" {
+		useWs = true
+		err := s.SetupWebSocket(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	common.RunWithScissors(ctx, s.errC, "SolanaWatcher", func(ctx context.Context) error {
 		timer := time.NewTicker(time.Second * 1)
 		defer timer.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
+			case msg := <-s.pumpData:
+				err := s.processAccountSubscriptionData(ctx, logger, msg)
+				if err != nil {
+					p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
+					solanaConnectionErrors.WithLabelValues(s.networkName, string(s.commitment), "account_subscription_data").Inc()
+					s.errC <- err
+					return err
+				}
 			case m := <-s.obsvReqC:
 				if m.ChainId != uint32(s.chainID) {
 					panic("unexpected chain id")
@@ -174,8 +325,8 @@ func (s *SolanaWatcher) Run(ctx context.Context) error {
 				if err != nil {
 					p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
 					solanaConnectionErrors.WithLabelValues(s.networkName, string(s.commitment), "get_slot_error").Inc()
-					errC <- err
-					return
+					s.errC <- err
+					return err
 				}
 
 				lastSlot := s.lastSlot
@@ -189,31 +340,37 @@ func (s *SolanaWatcher) Run(ctx context.Context) error {
 					ContractAddress: contractAddr,
 				})
 
-				rangeStart := lastSlot + 1
-				rangeEnd := slot
+				if !useWs {
+					rangeStart := lastSlot + 1
+					rangeEnd := slot
 
-				logger.Debug("fetched current Solana height",
-					zap.String("commitment", string(s.commitment)),
-					zap.Uint64("slot", slot),
-					zap.Uint64("lastSlot", lastSlot),
-					zap.Uint64("pendingSlots", slot-lastSlot),
-					zap.Uint64("from", rangeStart), zap.Uint64("to", rangeEnd),
-					zap.Duration("took", time.Since(start)))
+					logger.Debug("fetched current Solana height",
+						zap.String("commitment", string(s.commitment)),
+						zap.Uint64("slot", slot),
+						zap.Uint64("lastSlot", lastSlot),
+						zap.Uint64("pendingSlots", slot-lastSlot),
+						zap.Uint64("from", rangeStart), zap.Uint64("to", rangeEnd),
+						zap.Duration("took", time.Since(start)))
 
-				// Requesting each slot
-				for slot := rangeStart; slot <= rangeEnd; slot++ {
-					go s.retryFetchBlock(ctx, logger, slot, 0)
+					// Requesting each slot
+					for slot := rangeStart; slot <= rangeEnd; slot++ {
+						_slot := slot
+						common.RunWithScissors(ctx, s.errC, "SolanaWatcherSlotFetcher", func(ctx context.Context) error {
+							s.retryFetchBlock(ctx, logger, _slot, 0)
+							return nil
+						})
+					}
 				}
 
 				s.lastSlot = slot
 			}
 		}
-	}()
+	})
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-errC:
+	case err := <-s.errC:
 		return err
 	}
 }
@@ -237,7 +394,10 @@ func (s *SolanaWatcher) retryFetchBlock(ctx context.Context, logger *zap.Logger,
 			zap.String("commitment", string(s.commitment)),
 			zap.Uint("retry", retry))
 
-		go s.retryFetchBlock(ctx, logger, slot, retry+1)
+		common.RunWithScissors(ctx, s.errC, "retryFetchBlock", func(ctx context.Context) error {
+			s.retryFetchBlock(ctx, logger, slot, retry+1)
+			return nil
+		})
 	}
 }
 
@@ -264,7 +424,7 @@ func (s *SolanaWatcher) fetchBlock(ctx context.Context, logger *zap.Logger, slot
 	if err != nil {
 		var rpcErr *jsonrpc.RPCError
 		if errors.As(err, &rpcErr) && (rpcErr.Code == -32007 /* SLOT_SKIPPED */ || rpcErr.Code == -32004 /* BLOCK_NOT_AVAILABLE */) {
-			logger.Info("empty slot", zap.Uint64("slot", slot),
+			logger.Debug("empty slot", zap.Uint64("slot", slot),
 				zap.Int("code", rpcErr.Code),
 				zap.String("commitment", string(s.commitment)))
 
@@ -279,10 +439,11 @@ func (s *SolanaWatcher) fetchBlock(ctx context.Context, logger *zap.Logger, slot
 
 			// Schedule a single retry just in case the Solana node was confused about the block being missing.
 			if emptyRetry < maxEmptyRetry {
-				go func() {
+				common.RunWithScissors(ctx, s.errC, "delayedFetchBlock", func(ctx context.Context) error {
 					time.Sleep(retryDelay)
 					s.fetchBlock(ctx, logger, slot, emptyRetry+1)
-				}()
+					return nil
+				})
 			}
 			return true
 		} else {
@@ -465,7 +626,10 @@ func (s *SolanaWatcher) processInstruction(ctx context.Context, logger *zap.Logg
 	logger.Debug("fetching VAA account", zap.Stringer("acc", acc),
 		zap.Stringer("signature", signature), zap.Uint64("slot", slot), zap.Int("idx", idx))
 
-	go s.retryFetchMessageAccount(ctx, logger, acc, slot, 0)
+	common.RunWithScissors(ctx, s.errC, "retryFetchMessageAccount", func(ctx context.Context) error {
+		s.retryFetchMessageAccount(ctx, logger, acc, slot, 0)
+		return nil
+	})
 
 	return true, nil
 }
@@ -491,7 +655,10 @@ func (s *SolanaWatcher) retryFetchMessageAccount(ctx context.Context, logger *za
 			zap.String("commitment", string(s.commitment)),
 			zap.Uint("retry", retry))
 
-		go s.retryFetchMessageAccount(ctx, logger, acc, slot, retry+1)
+		common.RunWithScissors(ctx, s.errC, "retryFetchMessageAccount", func(ctx context.Context) error {
+			s.retryFetchMessageAccount(ctx, logger, acc, slot, retry+1)
+			return nil
+		})
 	}
 }
 
@@ -548,6 +715,64 @@ func (s *SolanaWatcher) fetchMessageAccount(ctx context.Context, logger *zap.Log
 	return false
 }
 
+func (s *SolanaWatcher) processAccountSubscriptionData(ctx context.Context, logger *zap.Logger, data []byte) error {
+	// Do we have an error on the subscription?
+	var e EventSubscriptionError
+	err := json.Unmarshal(data, &e)
+	if err != nil {
+		logger.Error(*s.wsUrl, zap.Error(err))
+		p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
+		return err
+	}
+
+	if e.Error.Message != nil {
+		return errors.New(*e.Error.Message)
+	}
+
+	var res EventSubscriptionData
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		logger.Error(*s.wsUrl, zap.Error(err))
+		p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
+		return err
+	}
+
+	if res.Params == nil {
+		return nil
+	}
+
+	value := (*res.Params).Result.Value
+
+	if value.Account.Owner != s.rawContract {
+		// We got a message for the wrong contract on the websocket... uncomfortable...
+		solanaConnectionErrors.WithLabelValues(s.networkName, string(s.commitment), "invalid_websocket_account").Inc()
+		return errors.New("Update for account with wrong owner")
+	}
+
+	data, err = base64.StdEncoding.DecodeString(value.Account.Data[0])
+	if err != nil {
+		logger.Error(*s.wsUrl, zap.Error(err))
+		p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
+		return err
+	}
+
+	// ignore truncated messages
+	if len(data) < 3 {
+		return nil
+	}
+
+	// Other accounts owned by the wormhole contract seem to send updates...
+	switch string(data[:3]) {
+	case accountPrefixReliable, accountPrefixUnreliable:
+		acc := solana.PublicKeyFromBytes([]byte(value.Pubkey))
+		s.processMessageAccount(logger, data, acc)
+	default:
+		break
+	}
+
+	return nil
+}
+
 func (s *SolanaWatcher) processMessageAccount(logger *zap.Logger, data []byte, acc solana.PublicKey) {
 	proposal, err := ParseMessagePublicationAccount(data)
 	if err != nil {
@@ -598,7 +823,7 @@ func (s *SolanaWatcher) processMessageAccount(logger *zap.Logger, data []byte, a
 		zap.Uint8("consistency_level", observation.ConsistencyLevel),
 	)
 
-	s.messageEvent <- observation
+	s.msgC <- observation
 }
 
 // updateLatestBlock() updates the latest block number if the slot passed in is greater than the previous value.
@@ -617,22 +842,6 @@ func (s *SolanaWatcher) GetLatestFinalizedBlockNumber() uint64 {
 	defer s.latestBlockNumberMu.Unlock()
 	return s.latestBlockNumber
 }
-
-type (
-	MessagePublicationAccount struct {
-		VaaVersion uint8
-		// Borsh does not seem to support booleans, so 0=false / 1=true
-		ConsistencyLevel    uint8
-		VaaTime             uint32
-		VaaSignatureAccount vaa.Address
-		SubmissionTime      uint32
-		Nonce               uint32
-		Sequence            uint64
-		EmitterChain        uint16
-		EmitterAddress      vaa.Address
-		Payload             []byte
-	}
-)
 
 func ParseMessagePublicationAccount(data []byte) (*MessagePublicationAccount, error) {
 	prop := &MessagePublicationAccount{}

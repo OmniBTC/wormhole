@@ -93,8 +93,12 @@ module token_bridge::contract_upgrade {
     fun authorize_upgrade(hash: &Hash) acquires UpgradeAuthorized {
         let token_bridge = state::token_bridge_signer();
         if (exists<UpgradeAuthorized>(@token_bridge)) {
-            // TODO(csongor): here we're dropping the upgrade hash, in case an
-            // upgrade fails for some reason. Should we emit a log or something?
+            // NOTE: here we're dropping the upgrade hash, allowing to override
+            // a previous upgrade that hasn't been executed. It's possible that
+            // an upgrade hash corresponds to bytecode that can't be upgraded
+            // to, because it fails bytecode compatibility verification. While
+            // that should never happen^TM, we don't want to deadlock the
+            // contract if it does.
             let UpgradeAuthorized { hash: _ } = move_from<UpgradeAuthorized>(@token_bridge);
         };
         move_to(&token_bridge, UpgradeAuthorized { hash: hash.hash });
@@ -197,7 +201,7 @@ module token_bridge::contract_upgrade_test {
     }
 
     #[test(deployer = @deployer)]
-    #[expected_failure(abort_code = 0x6407)]
+    #[expected_failure(abort_code = 0x6407, location = 0x1::table)]
     public fun test_contract_upgrade_double(deployer: &signer) {
         setup(deployer);
 
@@ -207,7 +211,7 @@ module token_bridge::contract_upgrade_test {
     }
 
     #[test(deployer = @deployer)]
-    #[expected_failure(abort_code = 4)]
+    #[expected_failure(abort_code = 4, location = token_bridge::contract_upgrade)]
     public fun test_contract_upgrade_wrong_chain(deployer: &signer) {
         setup(deployer);
 

@@ -1,6 +1,6 @@
 # Wormchain
 
-**Wormchain** is a blockchain built using Cosmos SDK and Tendermint and created with [Starport](https://github.com/tendermint/starport).
+**Wormchain** is a blockchain built using Cosmos SDK and Tendermint and initially created with [Ignite](https://github.com/ignite).
 
 ## Building
 
@@ -16,7 +16,7 @@ See [development.md](./development.md)
 
 ## How to run the tests
 
-    run either "starport chain serve" or "tilt up"
+    run "tilt up -- --wormchain"
     cd ./ts-sdk
     npm ci
     npm run build
@@ -24,10 +24,20 @@ See [development.md](./development.md)
     npm ci
     npm run test
 
-## Learn more about Cosmos & Starport
+## Learn more about Cosmos & Ignite
 
-- [Starport](https://github.com/tendermint/starport)
-- [Starport Docs](https://docs.starport.network)
+- [Ignite](https://github.com/ignite)
+- [Ignite Docs](https://docs.ignite.com/)
 - [Cosmos SDK documentation](https://docs.cosmos.network)
 - [Cosmos SDK Tutorials](https://tutorials.cosmos.network)
 - [Discord](https://discord.gg/cosmosnetwork)
+
+## Allowlists
+
+Accounts on wormchain are allowlisted.  To be able to submit a tx on wormchain, you must have an account that is either:
+* A validator on wormchain that is part of a current or future guardian set, or
+* An account that is allowlisted by a current validator on wormchain.
+
+To create or delete an allowlist entry, you use a validator account.  Allowlist entries can become stale,
+meaning the owning validators are no longer part of the validator set.  Any validator can delete or replace stale entries.
+To manage allowlists, use the `wormchaind` client.

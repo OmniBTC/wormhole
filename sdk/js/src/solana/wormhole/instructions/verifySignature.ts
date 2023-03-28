@@ -30,7 +30,7 @@ const MAX_LEN_GUARDIAN_KEYS = 19;
  *
  * There are at most three pairs of instructions created.
  *
- * https://github.com/certusone/wormhole/blob/dev.v2/solana/bridge/program/src/api/verify_signature.rs
+ * https://github.com/certusone/wormhole/blob/main/solana/bridge/program/src/api/verify_signature.rs
  *
  *
  * @param {Connection} connection - Solana web3 connection
@@ -70,8 +70,8 @@ export async function createVerifySignaturesInstructions(
   for (let i = 0; i < Math.ceil(guardianSignatures.length / batchSize); ++i) {
     const start = i * batchSize;
     const end = Math.min(guardianSignatures.length, (i + 1) * batchSize);
-
-    const signatureStatus = Buffer.alloc(MAX_LEN_GUARDIAN_KEYS, -1);
+ 
+    const signatureStatus = new Array(MAX_LEN_GUARDIAN_KEYS).fill(-1);
     const signatures: Buffer[] = [];
     const keys: Buffer[] = [];
     for (let j = 0; j < end - start; ++j) {
@@ -81,7 +81,7 @@ export async function createVerifySignaturesInstructions(
       const key = guardianKeys.at(item.index)!;
       keys.push(key);
 
-      signatureStatus.writeInt8(j, item.index);
+      signatureStatus[item.index] = j;
     }
 
     instructions.push(
@@ -107,7 +107,7 @@ export async function createVerifySignaturesInstructions(
  * `signatureSet` is a {@link web3.Keypair} generated outside of this method, used
  * for writing signatures and the message hash to.
  *
- * https://github.com/certusone/wormhole/blob/dev.v2/solana/bridge/program/src/api/verify_signature.rs
+ * https://github.com/certusone/wormhole/blob/main/solana/bridge/program/src/api/verify_signature.rs
  *
  * @param {PublicKeyInitData} wormholeProgramId - wormhole program address
  * @param {PublicKeyInitData} payer - transaction signer address
@@ -121,11 +121,11 @@ function createVerifySignaturesInstruction(
   payer: PublicKeyInitData,
   vaa: SignedVaa | ParsedVaa,
   signatureSet: PublicKeyInitData,
-  signatureStatus: Buffer
+  signatureStatus: number[]
 ): TransactionInstruction {
   const methods = createReadOnlyWormholeProgramInterface(
     wormholeProgramId
-  ).methods.verifySignatures(signatureStatus as any);
+  ).methods.verifySignatures(signatureStatus);
 
   // @ts-ignore
   return methods._ixFn(...methods._args, {

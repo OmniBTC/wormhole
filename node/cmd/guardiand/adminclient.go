@@ -2,15 +2,20 @@ package guardiand
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/davecgh/go-spew/spew"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/mr-tron/base58"
 	"github.com/spf13/pflag"
 
@@ -21,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/status-im/keycard-go/hexutils"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -49,6 +55,7 @@ func init() {
 	AdminClientFindMissingMessagesCmd.Flags().AddFlagSet(pf)
 	AdminClientListNodes.Flags().AddFlagSet(pf)
 	DumpVAAByMessageID.Flags().AddFlagSet(pf)
+	DumpRPCs.Flags().AddFlagSet(pf)
 	SendObservationRequest.Flags().AddFlagSet(pf)
 	ClientChainGovernorStatusCmd.Flags().AddFlagSet(pf)
 	ClientChainGovernorReloadCmd.Flags().AddFlagSet(pf)
@@ -56,12 +63,16 @@ func init() {
 	ClientChainGovernorReleasePendingVAACmd.Flags().AddFlagSet(pf)
 	ClientChainGovernorResetReleaseTimerCmd.Flags().AddFlagSet(pf)
 	PurgePythNetVaasCmd.Flags().AddFlagSet(pf)
+	SignExistingVaaCmd.Flags().AddFlagSet(pf)
+	SignExistingVaasFromCSVCmd.Flags().AddFlagSet(pf)
 
 	AdminCmd.AddCommand(AdminClientInjectGuardianSetUpdateCmd)
 	AdminCmd.AddCommand(AdminClientFindMissingMessagesCmd)
 	AdminCmd.AddCommand(AdminClientGovernanceVAAVerifyCmd)
 	AdminCmd.AddCommand(AdminClientListNodes)
+	AdminCmd.AddCommand(AdminClientSignWormchainAddress)
 	AdminCmd.AddCommand(DumpVAAByMessageID)
+	AdminCmd.AddCommand(DumpRPCs)
 	AdminCmd.AddCommand(SendObservationRequest)
 	AdminCmd.AddCommand(ClientChainGovernorStatusCmd)
 	AdminCmd.AddCommand(ClientChainGovernorReloadCmd)
@@ -69,11 +80,20 @@ func init() {
 	AdminCmd.AddCommand(ClientChainGovernorReleasePendingVAACmd)
 	AdminCmd.AddCommand(ClientChainGovernorResetReleaseTimerCmd)
 	AdminCmd.AddCommand(PurgePythNetVaasCmd)
+	AdminCmd.AddCommand(SignExistingVaaCmd)
+	AdminCmd.AddCommand(SignExistingVaasFromCSVCmd)
 }
 
 var AdminCmd = &cobra.Command{
 	Use:   "admin",
 	Short: "Guardian node admin commands",
+}
+
+var AdminClientSignWormchainAddress = &cobra.Command{
+	Use:   "sign-wormchain-address [/path/to/guardianKey] [wormchain-validator-address]",
+	Short: "Sign a wormchain validator address.  Only sign the address that you control the key for and will be for your validator.",
+	RunE:  runSignWormchainValidatorAddress,
+	Args:  cobra.ExactArgs(2),
 }
 
 var AdminClientInjectGuardianSetUpdateCmd = &cobra.Command{
@@ -146,6 +166,27 @@ var PurgePythNetVaasCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 2),
 }
 
+var SignExistingVaaCmd = &cobra.Command{
+	Use:   "sign-existing-vaa [VAA] [NEW_GUARDIANS] [NEW_GUARDIAN_SET_INDEX]",
+	Short: "Signs an existing VAA for a new guardian set using the local guardian key. This only works if the new VAA would have quorum.",
+	Run:   runSignExistingVaa,
+	Args:  cobra.ExactArgs(3),
+}
+
+var SignExistingVaasFromCSVCmd = &cobra.Command{
+	Use:   "sign-existing-vaas-csv [IN_FILE] [OUT_FILE] [NEW_GUARDIANS] [NEW_GUARDIAN_SET_INDEX]",
+	Short: "Signs a CSV [VAA_ID,VAA_HEX] of existing VAAs for a new guardian set using the local guardian key and writes it to a new CSV. VAAs that don't have quorum on the new set will be dropped.",
+	Run:   runSignExistingVaasFromCSV,
+	Args:  cobra.ExactArgs(4),
+}
+
+var DumpRPCs = &cobra.Command{
+	Use:   "dump-rpcs",
+	Short: "Displays the RPCs in use by the guardian",
+	Run:   runDumpRPCs,
+	Args:  cobra.ExactArgs(0),
+}
+
 func getAdminClient(ctx context.Context, addr string) (*grpc.ClientConn, nodev1.NodePrivilegedServiceClient, error) {
 	conn, err := grpc.DialContext(ctx, fmt.Sprintf("unix:///%s", addr), grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -166,6 +207,30 @@ func getPublicRPCServiceClient(ctx context.Context, addr string) (*grpc.ClientCo
 
 	c := publicrpcv1.NewPublicRPCServiceClient(conn)
 	return conn, c, err
+}
+
+func runSignWormchainValidatorAddress(cmd *cobra.Command, args []string) error {
+	guardianKeyPath := args[0]
+	wormchainAddress := args[1]
+	if !strings.HasPrefix(wormchainAddress, "wormhole") || strings.HasPrefix(wormchainAddress, "wormholeval") {
+		return fmt.Errorf("must provide a bech32 address that has 'wormhole' prefix")
+	}
+	gk, err := loadGuardianKey(guardianKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to load guardian key: %w", err)
+	}
+	addr, err := types.GetFromBech32(wormchainAddress, "wormhole")
+	if err != nil {
+		return fmt.Errorf("failed to decode wormchain address: %w", err)
+	}
+	// Hash and sign address
+	addrHash := crypto.Keccak256Hash(sdk.SignedWormchainAddressPrefix, addr)
+	sig, err := crypto.Sign(addrHash[:], gk)
+	if err != nil {
+		return fmt.Errorf("failed to sign wormchain address: %w", err)
+	}
+	fmt.Println(hex.EncodeToString(sig))
+	return nil
 }
 
 func runInjectGovernanceVAA(cmd *cobra.Command, args []string) {
@@ -289,7 +354,9 @@ func runSendObservationRequest(cmd *cobra.Command, args []string) {
 		log.Fatalf("invalid chain ID: %v", err)
 	}
 
-	txHash, err := hex.DecodeString(args[1])
+	// Support tx with or without leading 0x so copy / pasta
+	// from monitoring tools is easier.
+	txHash, err := hex.DecodeString(strings.TrimPrefix(args[1], "0x"))
 	if err != nil {
 		txHash, err = base58.Decode(args[1])
 		if err != nil {
@@ -314,6 +381,26 @@ func runSendObservationRequest(cmd *cobra.Command, args []string) {
 	})
 	if err != nil {
 		log.Fatalf("failed to send observation request: %v", err)
+	}
+}
+
+func runDumpRPCs(cmd *cobra.Command, args []string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, c, err := getAdminClient(ctx, *clientSocketPath)
+	if err != nil {
+		log.Fatalf("failed to get admin client: %v", err)
+	}
+	defer conn.Close()
+
+	resp, err := c.DumpRPCs(ctx, &nodev1.DumpRPCsRequest{})
+	if err != nil {
+		log.Fatalf("failed to run dump-rpcs: %s", err)
+	}
+
+	for parm, rpc := range resp.Response {
+		fmt.Println(parm, " = [", rpc, "]")
 	}
 }
 
@@ -456,4 +543,133 @@ func runPurgePythNetVaas(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println(resp.Response)
+}
+
+func runSignExistingVaa(cmd *cobra.Command, args []string) {
+	existingVAA := ethcommon.Hex2Bytes(args[0])
+	if len(existingVAA) == 0 {
+		log.Fatalf("vaa hex invalid")
+	}
+
+	newGsStrings := strings.Split(args[1], ",")
+
+	newGsIndex, err := strconv.ParseUint(args[2], 10, 32)
+	if err != nil {
+		log.Fatalf("invalid new guardian set index")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	conn, c, err := getAdminClient(ctx, *clientSocketPath)
+	if err != nil {
+		log.Fatalf("failed to get admin client: %v", err)
+	}
+	defer conn.Close()
+
+	msg := nodev1.SignExistingVAARequest{
+		Vaa:                 existingVAA,
+		NewGuardianAddrs:    newGsStrings,
+		NewGuardianSetIndex: uint32(newGsIndex),
+	}
+	resp, err := c.SignExistingVAA(ctx, &msg)
+	if err != nil {
+		log.Fatalf("failed to run SignExistingVAA RPC: %s", err)
+	}
+
+	fmt.Println(hex.EncodeToString(resp.Vaa))
+}
+
+func runSignExistingVaasFromCSV(cmd *cobra.Command, args []string) {
+	oldVAAFile, err := os.Open(args[0])
+	if err != nil {
+		log.Fatalf("failed to read old VAA db: %v", err)
+	}
+	defer oldVAAFile.Close()
+
+	newVAAFile, err := os.OpenFile(args[1], os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		log.Fatalf("failed to create new VAA db: %v", err)
+	}
+	defer newVAAFile.Close()
+	newVAAWriter := csv.NewWriter(newVAAFile)
+
+	newGsStrings := strings.Split(args[2], ",")
+
+	newGsIndex, err := strconv.ParseUint(args[3], 10, 32)
+	if err != nil {
+		log.Fatalf("invalid new guardian set index")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	conn, c, err := getAdminClient(ctx, *clientSocketPath)
+	if err != nil {
+		log.Fatalf("failed to get admin client: %v", err)
+	}
+	defer conn.Close()
+
+	// Scan the CSV once to make sure it won't fail while reading unless raced
+	oldVAAReader := csv.NewReader(oldVAAFile)
+	numOldVAAs := 0
+	for {
+		row, err := oldVAAReader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Fatalf("failed to parse VAA CSV: %v", err)
+		}
+		if len(row) != 2 {
+			log.Fatalf("row [%d] does not have 2 elements", numOldVAAs)
+		}
+		numOldVAAs++
+	}
+
+	// Reset reader
+	_, err = oldVAAFile.Seek(0, io.SeekStart)
+	if err != nil {
+		log.Fatalf("failed to seek back in CSV file: %v", err)
+	}
+	oldVAAReader = csv.NewReader(oldVAAFile)
+
+	counter, i := 0, 0
+	for {
+		row, err := oldVAAReader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Fatalf("failed to parse VAA CSV: %v", err)
+		}
+		if len(row) != 2 {
+			log.Fatalf("row [%d] does not have 2 elements", i)
+		}
+		i++
+
+		if i%10 == 0 {
+			log.Printf("Processing VAA %d/%d", i, numOldVAAs)
+		}
+
+		vaaBytes := ethcommon.Hex2Bytes(row[1])
+		msg := nodev1.SignExistingVAARequest{
+			Vaa:                 vaaBytes,
+			NewGuardianAddrs:    newGsStrings,
+			NewGuardianSetIndex: uint32(newGsIndex),
+		}
+		resp, err := c.SignExistingVAA(ctx, &msg)
+		if err != nil {
+			log.Printf("signing VAA (%s)[%d] failed - skipping: %v", row[0], i, err)
+			continue
+		}
+		err = newVAAWriter.Write([]string{row[0], hex.EncodeToString(resp.Vaa)})
+		if err != nil {
+			log.Fatalf("failed to write new VAA to out db: %v", err)
+		}
+		counter++
+	}
+
+	log.Printf("Successfully signed %d out of %d VAAs", counter, numOldVAAs)
+	newVAAWriter.Flush()
 }

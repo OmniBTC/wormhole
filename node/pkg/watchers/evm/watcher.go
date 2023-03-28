@@ -77,10 +77,10 @@ type (
 		chainID vaa.ChainID
 
 		// Channel to send new messages to.
-		msgChan chan *common.MessagePublication
+		msgC chan<- *common.MessagePublication
 
 		// Channel to send guardian set changes to.
-		// setChan can be set to nil if no guardian set changes are needed.
+		// setC can be set to nil if no guardian set changes are needed.
 		//
 		// We currently only fetch the guardian set from one primary chain, which should
 		// have this flag set to true, and false on all others.
@@ -88,11 +88,11 @@ type (
 		// The current primary chain is Ethereum (a mostly arbitrary decision because it
 		// has the best API - we might want to switch the primary chain to Solana once
 		// the governance mechanism lives there),
-		setChan chan *common.GuardianSet
+		setC chan<- *common.GuardianSet
 
 		// Incoming re-observation requests from the network. Pre-filtered to only
 		// include requests for our chainID.
-		obsvReqC chan *gossipv1.ObservationRequest
+		obsvReqC <-chan *gossipv1.ObservationRequest
 
 		pending   map[pendingKey]*pendingMessage
 		pendingMu sync.Mutex
@@ -141,9 +141,9 @@ func NewEthWatcher(
 	networkName string,
 	readiness readiness.Component,
 	chainID vaa.ChainID,
-	messageEvents chan *common.MessagePublication,
-	setEvents chan *common.GuardianSet,
-	obsvReqC chan *gossipv1.ObservationRequest,
+	msgC chan<- *common.MessagePublication,
+	setC chan<- *common.GuardianSet,
+	obsvReqC <-chan *gossipv1.ObservationRequest,
 	unsafeDevMode bool,
 ) *Watcher {
 
@@ -155,8 +155,8 @@ func NewEthWatcher(
 		waitForConfirmations: false,
 		maxWaitConfirmations: 60,
 		chainID:              chainID,
-		msgChan:              messageEvents,
-		setChan:              setEvents,
+		msgC:                 msgC,
+		setC:                 setC,
 		obsvReqC:             obsvReqC,
 		pending:              map[pendingKey]*pendingMessage{},
 		unsafeDevMode:        unsafeDevMode,
@@ -242,7 +242,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
 			return fmt.Errorf("dialing eth client failed: %w", err)
 		}
-		finalizer := finalizers.NewNeonFinalizer(logger, baseConnector, baseConnector.Client(), w.l1Finalizer)
+		finalizer := finalizers.NewNeonFinalizer(logger, w.l1Finalizer)
 		pollConnector, err := connectors.NewBlockPollConnector(ctx, baseConnector, finalizer, 250*time.Millisecond, false, false)
 		if err != nil {
 			ethConnectionErrors.WithLabelValues(w.networkName, "dial_error").Inc()
@@ -265,7 +265,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
 			return fmt.Errorf("dialing eth client failed: %w", err)
 		}
-		finalizer := finalizers.NewArbitrumFinalizer(logger, baseConnector, baseConnector.Client(), w.l1Finalizer)
+		finalizer := finalizers.NewArbitrumFinalizer(logger, w.l1Finalizer)
 		pollConnector, err := connectors.NewBlockPollConnector(ctx, baseConnector, finalizer, 250*time.Millisecond, false, false)
 		if err != nil {
 			ethConnectionErrors.WithLabelValues(w.networkName, "dial_error").Inc()
@@ -288,7 +288,11 @@ func (w *Watcher) Run(ctx context.Context) error {
 			p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
 			return fmt.Errorf("dialing eth client failed: %w", err)
 		}
-		finalizer := finalizers.NewOptimismFinalizer(timeout, logger, baseConnector, w.l1Finalizer)
+		finalizer, err := finalizers.NewOptimismFinalizer(timeout, logger, w.l1Finalizer, w.rootChainRpc, w.rootChainContract)
+		if err != nil {
+			p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
+			return fmt.Errorf("creating optimism finalizer failed: %w", err)
+		}
 		w.ethConn, err = connectors.NewBlockPollConnector(ctx, baseConnector, finalizer, 250*time.Millisecond, false, false)
 		if err != nil {
 			ethConnectionErrors.WithLabelValues(w.networkName, "dial_error").Inc()
@@ -321,10 +325,12 @@ func (w *Watcher) Run(ctx context.Context) error {
 		}
 	}
 
+	errC := make(chan error)
+
 	// Subscribe to new message publications. We don't use a timeout here because the LogPollConnector
 	// will keep running. Other connectors will use a timeout internally if appropriate.
 	messageC := make(chan *ethabi.AbiLogMessagePublished, 2)
-	messageSub, err := w.ethConn.WatchLogMessagePublished(ctx, messageC)
+	messageSub, err := w.ethConn.WatchLogMessagePublished(ctx, errC, messageC)
 	if err != nil {
 		ethConnectionErrors.WithLabelValues(w.networkName, "subscribe_error").Inc()
 		p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
@@ -337,35 +343,33 @@ func (w *Watcher) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to request guardian set: %v", err)
 	}
 
-	errC := make(chan error)
-
 	// Poll for guardian set.
-	go func() {
+	common.RunWithScissors(ctx, errC, "evm_fetch_guardian_set", func(ctx context.Context) error {
 		t := time.NewTicker(15 * time.Second)
 		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case <-t.C:
 				if err := w.fetchAndUpdateGuardianSet(logger, ctx, w.ethConn); err != nil {
 					errC <- fmt.Errorf("failed to request guardian set: %v", err)
-					return
+					return nil
 				}
 			}
 		}
-	}()
+	})
 
 	// Track the current block numbers so we can compare it to the block number of
 	// the message publication for observation requests.
 	var currentBlockNumber uint64
 	var currentSafeBlockNumber uint64
 
-	go func() {
+	common.RunWithScissors(ctx, errC, "evm_fetch_objs_req", func(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case r := <-w.obsvReqC:
 				// This can't happen unless there is a programming error - the caller
 				// is expected to send us only requests for our chainID.
@@ -408,7 +412,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 							zap.Uint64("observed_block", blockNumber),
 							zap.String("eth_network", w.networkName),
 						)
-						w.msgChan <- msg
+						w.msgC <- msg
 						continue
 					}
 
@@ -428,7 +432,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 								zap.Uint64("observed_block", blockNumber),
 								zap.String("eth_network", w.networkName),
 							)
-							w.msgChan <- msg
+							w.msgC <- msg
 						} else {
 							logger.Info("ignoring re-observed message publication transaction",
 								zap.Stringer("tx", msg.TxHash),
@@ -473,7 +477,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 							zap.Uint64("observed_block", blockNumber),
 							zap.String("eth_network", w.networkName),
 						)
-						w.msgChan <- msg
+						w.msgC <- msg
 					} else {
 						logger.Info("ignoring re-observed message publication transaction",
 							zap.Stringer("tx", msg.TxHash),
@@ -488,18 +492,18 @@ func (w *Watcher) Run(ctx context.Context) error {
 				}
 			}
 		}
-	}()
+	})
 
-	go func() {
+	common.RunWithScissors(ctx, errC, "evm_fetch_messages", func(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case err := <-messageSub.Err():
 				ethConnectionErrors.WithLabelValues(w.networkName, "subscription_error").Inc()
 				errC <- fmt.Errorf("error while processing message publication subscription: %w", err)
 				p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
-				return
+				return nil
 			case ev := <-messageC:
 				// Request timestamp for block
 				msm := time.Now()
@@ -513,7 +517,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 					p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
 					errC <- fmt.Errorf("failed to request timestamp for block %d, hash %s: %w",
 						ev.Raw.BlockNumber, ev.Raw.BlockHash.String(), err)
-					return
+					return nil
 				}
 
 				message := &common.MessagePublication{
@@ -539,7 +543,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 						zap.Uint8("ConsistencyLevel", ev.ConsistencyLevel),
 						zap.String("eth_network", w.networkName))
 
-					w.msgChan <- message
+					w.msgC <- message
 					ethMessagesConfirmed.WithLabelValues(w.networkName).Inc()
 					continue
 				}
@@ -568,27 +572,27 @@ func (w *Watcher) Run(ctx context.Context) error {
 				w.pendingMu.Unlock()
 			}
 		}
-	}()
+	})
 
 	// Watch headers
 	headSink := make(chan *connectors.NewBlock, 2)
-	headerSubscription, err := w.ethConn.SubscribeForBlocks(ctx, headSink)
+	headerSubscription, err := w.ethConn.SubscribeForBlocks(ctx, errC, headSink)
 	if err != nil {
 		ethConnectionErrors.WithLabelValues(w.networkName, "header_subscribe_error").Inc()
 		p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
 		return fmt.Errorf("failed to subscribe to header events: %w", err)
 	}
 
-	go func() {
+	common.RunWithScissors(ctx, errC, "evm_fetch_headers", func(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case err := <-headerSubscription.Err():
 				ethConnectionErrors.WithLabelValues(w.networkName, "header_subscription_error").Inc()
 				errC <- fmt.Errorf("error while processing header subscription: %w", err)
 				p2p.DefaultRegistry.AddErrorCount(w.chainID, 1)
-				return
+				return nil
 			case ev := <-headSink:
 				// These two pointers should have been checked before the event was placed on the channel, but just being safe.
 				if ev == nil {
@@ -602,7 +606,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 
 				start := time.Now()
 				currentHash := ev.Hash
-				logger.Info("processing new header",
+				logger.Debug("processing new header",
 					zap.Stringer("current_block", ev.Number),
 					zap.Stringer("current_blockhash", currentHash),
 					zap.Bool("is_safe_block", ev.Safe),
@@ -749,13 +753,13 @@ func (w *Watcher) Run(ctx context.Context) error {
 							zap.Stringer("current_blockhash", currentHash),
 							zap.String("eth_network", w.networkName))
 						delete(w.pending, key)
-						w.msgChan <- pLock.message
+						w.msgC <- pLock.message
 						ethMessagesConfirmed.WithLabelValues(w.networkName).Inc()
 					}
 				}
 
 				w.pendingMu.Unlock()
-				logger.Info("processed new header",
+				logger.Debug("processed new header",
 					zap.Stringer("current_block", ev.Number),
 					zap.Bool("is_safe_block", ev.Safe),
 					zap.Stringer("current_blockhash", currentHash),
@@ -763,7 +767,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 					zap.String("eth_network", w.networkName))
 			}
 		}
-	}()
+	})
 
 	// Now that the init is complete, peg readiness. That will also happen when we process a new head, but chains
 	// that wait for finality may take a while to receive the first block and we don't want to hold up the init.
@@ -783,7 +787,7 @@ func (w *Watcher) fetchAndUpdateGuardianSet(
 	ethConn connectors.Connector,
 ) error {
 	msm := time.Now()
-	logger.Info("fetching guardian set")
+	logger.Debug("fetching guardian set")
 	timeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	idx, gs, err := fetchCurrentGuardianSet(timeout, ethConn)
@@ -805,8 +809,8 @@ func (w *Watcher) fetchAndUpdateGuardianSet(
 
 	w.currentGuardianSet = &idx
 
-	if w.setChan != nil {
-		w.setChan <- &common.GuardianSet{
+	if w.setC != nil {
+		w.setC <- &common.GuardianSet{
 			Keys:  gs.Keys,
 			Index: idx,
 		}

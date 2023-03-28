@@ -123,6 +123,17 @@ func (a Address) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, a)), nil
 }
 
+// Standard marshal stores the Address like this: "[0,0,0,0,0,0,0,0,0,0,0,0,2,144,251,22,114,8,175,69,91,177,55,120,1,99,183,183,169,161,12,22]"
+// The above MarshalJSON stores it like this (66 bytes): ""0000000000000000000000000290fb167208af455bb137780163b7b7a9a10c16""
+func (a *Address) UnmarshalJSON(data []byte) error {
+	addr, err := StringToAddress(strings.Trim(string(data), `"`))
+	if err != nil {
+		return err
+	}
+	*a = addr
+	return nil
+}
+
 func (a Address) String() string {
 	return hex.EncodeToString(a[:])
 }
@@ -262,6 +273,38 @@ func ChainIDFromString(s string) (ChainID, error) {
 		return ChainIDBtc, nil
 	default:
 		return ChainIDUnset, fmt.Errorf("unknown chain ID: %s", s)
+	}
+}
+
+func GetAllNetworkIDs() []ChainID {
+	return []ChainID{
+		ChainIDSolana,
+		ChainIDEthereum,
+		ChainIDTerra,
+		ChainIDBSC,
+		ChainIDPolygon,
+		ChainIDAvalanche,
+		ChainIDOasis,
+		ChainIDAlgorand,
+		ChainIDAurora,
+		ChainIDFantom,
+		ChainIDKarura,
+		ChainIDAcala,
+		ChainIDKlaytn,
+		ChainIDCelo,
+		ChainIDNear,
+		ChainIDMoonbeam,
+		ChainIDNeon,
+		ChainIDTerra2,
+		ChainIDInjective,
+		ChainIDSui,
+		ChainIDAptos,
+		ChainIDArbitrum,
+		ChainIDOptimism,
+		ChainIDPythNet,
+		ChainIDXpla,
+		ChainIDBtc,
+		ChainIDWormchain,
 	}
 }
 
@@ -631,7 +674,25 @@ func (v *BatchVAA) ObsvHashArray() []common.Hash {
 	return hashes
 }
 
-func VerifySignatures(data []byte, signatures []*Signature, addresses []common.Address) bool {
+// Verify Signature checks that the provided address matches the address that created the signature for the provided digest
+// Digest should be the output of SigningMsg(data).Bytes()
+func VerifySignature(digest []byte, signature *Signature, address common.Address) bool {
+	// retrieve the address that signed the data
+	pubKey, err := crypto.Ecrecover(digest, signature.Signature[:])
+	if err != nil {
+		return false
+	}
+	addr := common.BytesToAddress(crypto.Keccak256(pubKey[1:])[12:])
+
+	// check that the recovered address equals the provided address
+	return addr == address
+}
+
+// Digest should be the output of SigningMsg(data).Bytes()
+func VerifySignatures(digest []byte, signatures []*Signature, addresses []common.Address) bool {
+	if len(addresses) < len(signatures) {
+		return false
+	}
 
 	last_index := -1
 	signing_addresses := []common.Address{}
@@ -647,15 +708,10 @@ func VerifySignatures(data []byte, signatures []*Signature, addresses []common.A
 		}
 		last_index = int(sig.Index)
 
-		// Get pubKey to determine who signers address
-		pubKey, err := crypto.Ecrecover(data, sig.Signature[:])
-		if err != nil {
-			return false
-		}
-		addr := common.BytesToAddress(crypto.Keccak256(pubKey[1:])[12:])
-
-		// Ensure this signer is at the correct positional index
-		if addr != addresses[sig.Index] {
+		// verify this signature
+		addr := addresses[sig.Index]
+		ok := VerifySignature(digest, sig, addr)
+		if !ok {
 			return false
 		}
 
@@ -674,20 +730,12 @@ func VerifySignatures(data []byte, signatures []*Signature, addresses []common.A
 // VerifySignatures verifies the signature of the VAA given the signer addresses.
 // Returns true if the signatures were verified successfully.
 func (v *VAA) VerifySignatures(addresses []common.Address) bool {
-	if len(addresses) < len(v.Signatures) {
-		return false
-	}
-
 	return VerifySignatures(v.SigningMsg().Bytes(), v.Signatures, addresses)
 }
 
 // VerifySignatures verifies the signature of the BatchVAA given the signer addresses.
 // Returns true if the signatures were verified successfully.
 func (v *BatchVAA) VerifySignatures(addresses []common.Address) bool {
-	if len(addresses) < len(v.Signatures) {
-		return false
-	}
-
 	return VerifySignatures(v.SigningMsg().Bytes(), v.Signatures, addresses)
 }
 

@@ -9,10 +9,10 @@ import (
 )
 
 // fetchAndParseChunk goes through all transactions in a chunk and returns a list of transactionProcessingJob
-func (e *Watcher) fetchAndParseChunk(logger *zap.Logger, ctx context.Context, chunkHeader nearapi.ChunkHeader) ([]transactionProcessingJob, error) {
+func (e *Watcher) fetchAndParseChunk(logger *zap.Logger, ctx context.Context, chunkHeader nearapi.ChunkHeader) ([]*transactionProcessingJob, error) {
 	logger.Debug("near.fetchAndParseChunk", zap.String("chunk_hash", chunkHeader.Hash))
 
-	result := []transactionProcessingJob{}
+	var result []*transactionProcessingJob
 
 	chunk, err := e.nearAPI.GetChunk(ctx, chunkHeader)
 	if err != nil {
@@ -29,7 +29,7 @@ func (e *Watcher) fetchAndParseChunk(logger *zap.Logger, ctx context.Context, ch
 
 // recursivelyReadFinalizedBlocks walks back the blockchain from the startBlock (inclusive)
 // until it reaches a block of height stopHeight or less (exclusive). Chunks from all these blocks are put
-// into e.chunkProcessingQueque with the chunks from the oldest block first
+// into e.chunkProcessingqueue with the chunks from the oldest block first
 // if there is an error while walking back the chain, no chunks will be returned
 func (e *Watcher) recursivelyReadFinalizedBlocks(logger *zap.Logger, ctx context.Context, startBlock nearapi.Block, stopHeight uint64, chunkSink chan<- nearapi.ChunkHeader, recursionDepth uint) error {
 
@@ -60,7 +60,7 @@ func (e *Watcher) recursivelyReadFinalizedBlocks(logger *zap.Logger, ctx context
 			return err
 		}
 
-		logger.Info(
+		logger.Debug(
 			"block_polled",
 			zap.String("log_msg_type", "block_poll"),
 			zap.Uint64("height", startBlock.Header.Height),
@@ -75,7 +75,7 @@ func (e *Watcher) recursivelyReadFinalizedBlocks(logger *zap.Logger, ctx context
 	return nil
 }
 
-// readFinalChunksSince polls the NEAR blockchain for new blocks with height > startHeight, parses out the chunks and places
+// ReadFinalChunksSince polls the NEAR blockchain for new blocks with height > startHeight, parses out the chunks and places
 // them into `chunkSink` in the order they were recorded on the blockchain
 // returns the height of the latest final block
 func (e *Watcher) ReadFinalChunksSince(logger *zap.Logger, ctx context.Context, startHeight uint64, chunkSink chan<- nearapi.ChunkHeader) (newestFinalHeight uint64, err error) {
@@ -90,7 +90,7 @@ func (e *Watcher) ReadFinalChunksSince(logger *zap.Logger, ctx context.Context, 
 
 	if newestFinalHeight > startHeight {
 
-		logger.Info(
+		logger.Debug(
 			"polling_attempt",
 			zap.String("log_msg_type", "polling_attempt"),
 			zap.Uint64("previous_height", startHeight),

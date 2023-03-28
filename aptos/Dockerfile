@@ -1,4 +1,4 @@
-FROM ghcr.io/wormhole-foundation/aptos:0.4.0@sha256:19252a9d4f6d9f7e20074c3cfc98e6a81bea5736f8f8c3a4fb1bb09737a8e044 as aptos
+FROM ghcr.io/wormhole-foundation/aptos:1.0.4@sha256:0610c97ba32aab7113765b05a0c71d75b3842f7ee11ff8d7f75bd0ea03ad95b2 as aptos
 
 # Support additional root CAs
 COPY cert.pem* /certs/
@@ -8,6 +8,7 @@ WORKDIR /tmp
 
 COPY wormhole/ wormhole
 COPY token_bridge/ token_bridge
+COPY nft_bridge/ nft_bridge
 COPY deployer/ deployer
 COPY coin/ coin
 COPY examples/ examples
@@ -20,5 +21,4 @@ FROM aptos AS tests
 
 WORKDIR /tmp
 
-RUN --mount=type=cache,target=/root/.move,id=move_cache \
-    make test
+RUN    make test

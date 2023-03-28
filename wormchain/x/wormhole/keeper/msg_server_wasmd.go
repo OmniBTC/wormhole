@@ -3,22 +3,16 @@ package keeper
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 
 	wasmdtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/wormhole-foundation/wormchain/x/wormhole/types"
+	"github.com/wormhole-foundation/wormhole/sdk/vaa"
 	"golang.org/x/crypto/sha3"
 )
 
-// WasmdModule is the identifier of the Wasmd module (which is used for governance messages)
-var WasmdModule = [32]byte{00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x57, 0x61, 0x73, 0x6D, 0x64, 0x4D, 0x6F, 0x64, 0x75, 0x6C, 0x65}
-
-var (
-	ActionStoreCode           GovernanceAction = 1
-	ActionInstantiateContract GovernanceAction = 2
-)
+var WASMD_CONTRACT_ADMIN = sdk.AccAddress("wormchain_wasmd_owner")
 
 // Simple wrapper of x/wasmd StoreCode that requires a VAA
 func (k msgServer) StoreCode(goCtx context.Context, msg *types.MsgStoreCode) (*types.MsgStoreCodeResponse, error) {
@@ -33,12 +27,12 @@ func (k msgServer) StoreCode(goCtx context.Context, msg *types.MsgStoreCode) (*t
 		return nil, err
 	}
 	// Verify VAA
-	action, payload, err := k.VerifyGovernanceVAA(ctx, v, WasmdModule)
+	action, payload, err := k.VerifyGovernanceVAA(ctx, v, vaa.WasmdModule)
 	if err != nil {
 		return nil, err
 	}
 
-	if GovernanceAction(action) != ActionStoreCode {
+	if vaa.GovernanceAction(action) != vaa.ActionStoreCode {
 		return nil, types.ErrUnknownGovernanceAction
 	}
 
@@ -60,12 +54,13 @@ func (k msgServer) StoreCode(goCtx context.Context, msg *types.MsgStoreCode) (*t
 		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
 		sdk.NewAttribute(sdk.AttributeKeySender, msg.Signer),
 	))
-	codeID, err := k.wasmdKeeper.Create(ctx, senderAddr, msg.WASMByteCode, &wasmdtypes.DefaultUploadAccess)
+	codeID, chksum, err := k.wasmdKeeper.Create(ctx, senderAddr, msg.WASMByteCode, &wasmdtypes.DefaultUploadAccess)
 	if err != nil {
 		return nil, err
 	}
 	return &types.MsgStoreCodeResponse{
-		CodeID: codeID,
+		CodeID:   codeID,
+		Checksum: chksum,
 	}, nil
 }
 
@@ -83,25 +78,18 @@ func (k msgServer) InstantiateContract(goCtx context.Context, msg *types.MsgInst
 	}
 
 	// Verify VAA
-	action, payload, err := k.VerifyGovernanceVAA(ctx, v, WasmdModule)
+	action, payload, err := k.VerifyGovernanceVAA(ctx, v, vaa.WasmdModule)
 	if err != nil {
 		return nil, err
 	}
 
-	if GovernanceAction(action) != ActionInstantiateContract {
+	if vaa.GovernanceAction(action) != vaa.ActionInstantiateContract {
 		return nil, types.ErrUnknownGovernanceAction
 	}
 
-	// Need to verify the msg contents by checking sha3.Sum(BigEndian(CodeID) || Label || Msg)
-	// The vaa governance payload must contain this hash.
-
-	var expected_hash [32]byte
-	keccak := sha3.NewLegacyKeccak256()
-	binary.Write(keccak, binary.BigEndian, msg.CodeID)
-	keccak.Write([]byte(msg.Label))
-	keccak.Write([]byte(msg.Msg))
-	keccak.Sum(expected_hash[:0])
-
+	// Need to verify the instantiation arguments
+	// The vaa governance payload must contain the hash of the expected args.
+	expected_hash := vaa.CreateInstatiateCosmwasmContractHash(msg.CodeID, msg.Label, msg.Msg)
 	if !bytes.Equal(payload, expected_hash[:]) {
 		return nil, types.ErrInvalidHash
 	}
@@ -116,12 +104,63 @@ func (k msgServer) InstantiateContract(goCtx context.Context, msg *types.MsgInst
 		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
 		sdk.NewAttribute(sdk.AttributeKeySender, msg.Signer),
 	))
-	contract_addr, data, err := k.wasmdKeeper.Instantiate(ctx, msg.CodeID, senderAddr, sdk.AccAddress{}, msg.Msg, msg.Label, sdk.Coins{})
+	contract_addr, data, err := k.wasmdKeeper.Instantiate(ctx, msg.CodeID, senderAddr, WASMD_CONTRACT_ADMIN, msg.Msg, msg.Label, sdk.Coins{})
 	if err != nil {
 		return nil, err
 	}
 	return &types.MsgInstantiateContractResponse{
 		Address: contract_addr.String(),
 		Data:    data,
+	}, nil
+}
+
+func (k msgServer) MigrateContract(goCtx context.Context, msg *types.MsgMigrateContract) (*types.MsgMigrateContractResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	// Parse VAA
+	v, err := ParseVAA(msg.Vaa)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify VAA
+	action, payload, err := k.VerifyGovernanceVAA(ctx, v, vaa.WasmdModule)
+	if err != nil {
+		return nil, err
+	}
+
+	if vaa.GovernanceAction(action) != vaa.ActionMigrateContract {
+		return nil, types.ErrUnknownGovernanceAction
+	}
+
+	// Need to verify the instantiation arguments
+	// The vaa governance payload must contain the hash of the expected args.
+	expected_hash := vaa.CreateMigrateCosmwasmContractHash(msg.CodeID, msg.Contract, msg.Msg)
+	if !bytes.Equal(payload, expected_hash[:]) {
+		return nil, types.ErrInvalidHash
+	}
+
+	_, err = sdk.AccAddressFromBech32(msg.Signer)
+	if err != nil {
+		return nil, sdkerrors.Wrap(err, "sender")
+	}
+	contractAddr, err := sdk.AccAddressFromBech32(msg.Contract)
+	if err != nil {
+		return nil, sdkerrors.Wrap(err, "contract")
+	}
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		sdk.EventTypeMessage,
+		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+		sdk.NewAttribute(sdk.AttributeKeySender, msg.Signer),
+	))
+
+	data, err := k.wasmdKeeper.Migrate(ctx, contractAddr, WASMD_CONTRACT_ADMIN, msg.CodeID, msg.Msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.MsgMigrateContractResponse{
+		Data: data,
 	}, nil
 }
