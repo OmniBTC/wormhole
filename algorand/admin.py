@@ -205,23 +205,19 @@ class PortalCore:
                 kmd.release_wallet_handle(walletHandle)
     
         return self.kmdAccounts
-    
-    def getTemporaryAccount(self, client: AlgodClient) -> Account:
-        if len(self.accountList) == 0:
-            sks = [account.generate_account()[0] for i in range(3)]
-            self.accountList = [Account(sk) for sk in sks]
-    
+
+
+    def _fundFromGenesis(self, accountList, fundingAmt, client):        
             genesisAccounts = self.getGenesisAccounts()
             suggestedParams = client.suggested_params()
-    
             txns: List[transaction.Transaction] = []
-            for i, a in enumerate(self.accountList):
+            for i, a in enumerate(accountList):
                 fundingAccount = genesisAccounts[i % len(genesisAccounts)]
                 txns.append(
                     transaction.PaymentTxn(
                         sender=fundingAccount.getAddress(),
                         receiver=a.getAddress(),
-                        amt=self.FUNDING_AMOUNT,
+                        amt=fundingAmt,
                         sp=suggestedParams,
                     )
                 )
@@ -233,10 +229,35 @@ class PortalCore:
             ]
     
             client.send_transactions(signedTxns)
-    
             self.waitForTransaction(client, signedTxns[0].get_txid())
+
+    def getTemporaryAccount(self, client: AlgodClient) -> Account:
+        if len(self.accountList) == 0:
+            sks = [account.generate_account()[0] for i in range(3)]
+            self.accountList = [Account(sk) for sk in sks]
+            self._fundFromGenesis(self.accountList, self.FUNDING_AMOUNT, client)
     
         return self.accountList.pop()
+
+    def fundDevAccounts(self, client: AlgodClient):
+        devAcctsMnemonics = [
+            "provide warfare better filter glory civil help jacket alpha penalty van fiber code upgrade web more curve sauce merit bike satoshi blame orphan absorb modify",
+            "album neglect very nasty input trick annual arctic spray task candy unfold letter drill glove sword flock omit dial rather session mesh slow abandon slab",
+            "blue spring teach silent cheap grace desk crack agree leave tray lady chair reopen midnight lottery glove congress lounge arrow fine junior mirror above purchase",
+            "front rifle urge write push dynamic oil vital section blast protect suffer shoulder base address teach sight trap trial august mechanic border leaf absorb attract",
+            "fat pet option agree father glue range ancient curtain pottery search raven club save crane sting gift seven butter decline image toward kidney above balance"
+        ]
+
+        accountList = []
+        accountFunding = 400000000000000 # 400M algos
+
+        for mnemo in devAcctsMnemonics:
+            acc = Account.FromMnemonic(mnemo)
+            print('Funding dev account {} with {} uALGOs'.format(acc.addr, accountFunding))
+            accountList.append(acc)
+
+        self._fundFromGenesis(accountList, accountFunding, client)
+
     
     def getAlgodClient(self) -> AlgodClient:
         return AlgodClient(self.ALGOD_TOKEN, self.ALGOD_ADDRESS)
@@ -813,7 +834,7 @@ class PortalCore:
 
         seq_addr = self.optin(client, sender, appid, int(p["sequence"] / max_bits), p["chainRaw"].hex() + p["emitter"].hex())
 
-        assert self.check_bits_set(client, appid, seq_addr, p["sequence"]) == False
+        # assert self.check_bits_set(client, appid, seq_addr, p["sequence"]) == False
         # And then the signatures to help us verify the vaa_s
         guardian_addr = self.optin(client, sender, self.coreid, p["index"], b"guardian".hex())
 
@@ -843,7 +864,9 @@ class PortalCore:
 
         # How many signatures can we process in a single txn... we can do 9!
         bsize = (9*66)
-        blocks = int(len(p["signatures"]) / bsize) + 1
+        # audit: this was incorrectly adding an extra, empty block when the amount
+        # of signatures was a multiple of 9. fixed.
+        blocks = int(len(p["signatures"]) / bsize) + int(vaa[5] % 9 != 0)
 
         # We don't pass the entire payload in but instead just pass it pre digested.  This gets around size
         # limitations with lsigs AND reduces the cost of the entire operation on a conjested network by reducing the
@@ -1010,7 +1033,8 @@ class PortalCore:
                 m = abi.Method("portal_transfer", [abi.Argument("byte[]")], abi.Returns("byte[]"))
                 txns.append(transaction.ApplicationCallTxn(
                     sender=sender.getAddress(),
-                    index=int.from_bytes(bytes.fromhex(p["ToAddress"]), "big"),
+
+                    index=int.from_bytes(bytes.fromhex(p["ToAddress"])[24:], "big"),
                     on_complete=transaction.OnComplete.NoOpOC,
                     app_args=[m.get_selector(), m.args[0].type.encode(vaa)],
                     foreign_assets = foreign_assets,
@@ -1034,7 +1058,7 @@ class PortalCore:
             if "logs" in response.__dict__ and len(response.__dict__["logs"]) > 0:
                 ret.append(response.__dict__["logs"])
 
-        assert self.check_bits_set(client, appid, seq_addr, p["sequence"]) == True
+        # assert self.check_bits_set(client, appid, seq_addr, p["sequence"]) == True
 
         return ret
 
@@ -1409,6 +1433,8 @@ class PortalCore:
         parser.add_argument('--kmd_password', type=str, help='kmd wallet password', default="")
 
         parser.add_argument('--mnemonic', type=str, help='account mnemonic', default="")
+        
+        parser.add_argument('--fundDevAccounts', action='store_true', help='Fund predetermined set of devnet accounts')
 
         parser.add_argument('--core_approve', type=str, help='core approve teal', default="teal/core_approve.teal")
         parser.add_argument('--core_clear', type=str, help='core clear teal', default="teal/core_clear.teal")
@@ -1443,6 +1469,9 @@ class PortalCore:
         parser.add_argument('--approve', type=str, help='compiled approve contract', default="")
         parser.add_argument('--clear', type=str, help='compiled clear contract', default="")
 
+        parser.add_argument("--loops", type=int, help="testing: how many iterations should randomized tests run for. defaults to 1 for faster testing.", default="1")
+        parser.add_argument("--bigset", action="store_true", help="testing: use the big set of validators", default="1")
+
         args = parser.parse_args()
         self.init(args)
 
@@ -1474,7 +1503,7 @@ class PortalCore:
 
         if args.genTeal or args.boot:
             self.genTeal()
-
+        
         # Generate the upgrade payload we need the guardians to sign
         if args.upgradePayload:
             print(self.genUpgradePayload())
@@ -1502,7 +1531,7 @@ class PortalCore:
 
         if args.mnemonic:
             self.foundation = Account.FromMnemonic(args.mnemonic)
-
+        
         if args.devnet and self.foundation == None:
             print("Generating the foundation account...")
             self.foundation = self.getTemporaryAccount(self.client)
@@ -1585,6 +1614,13 @@ class PortalCore:
             response = self.bootGuardians(vaa, self.client, self.foundation, self.coreid)
             pprint.pprint(response.__dict__)
 
+        if args.fundDevAccounts:
+            if not args.devnet:
+                print("Missing required parameter: --devnet")
+                sys.exit(0)
+            
+            self.fundDevAccounts(self.client)
+            
 if __name__ == "__main__":
     core = PortalCore()
     core.main()

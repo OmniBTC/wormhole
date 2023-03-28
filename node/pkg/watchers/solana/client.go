@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/certusone/wormhole/node/pkg/common"
@@ -38,6 +39,10 @@ type SolanaWatcher struct {
 	networkName string
 	// The last slot processed by the watcher.
 	lastSlot uint64
+
+	// latestFinalizedBlockNumber is the latest block processed by this watcher.
+	latestBlockNumber   uint64
+	latestBlockNumberMu sync.Mutex
 }
 
 var (
@@ -183,20 +188,17 @@ func (s *SolanaWatcher) Run(ctx context.Context) error {
 					Height:          int64(slot),
 					ContractAddress: contractAddr,
 				})
-				logger.Info("fetched current Solana height",
-					zap.String("commitment", string(s.commitment)),
-					zap.Uint64("slot", slot),
-					zap.Uint64("lastSlot", lastSlot),
-					zap.Uint64("pendingSlots", slot-lastSlot),
-					zap.Duration("took", time.Since(start)))
 
 				rangeStart := lastSlot + 1
 				rangeEnd := slot
 
-				logger.Info("fetching slots in range",
+				logger.Debug("fetched current Solana height",
+					zap.String("commitment", string(s.commitment)),
+					zap.Uint64("slot", slot),
+					zap.Uint64("lastSlot", lastSlot),
+					zap.Uint64("pendingSlots", slot-lastSlot),
 					zap.Uint64("from", rangeStart), zap.Uint64("to", rangeEnd),
-					zap.Duration("took", time.Since(start)),
-					zap.String("commitment", string(s.commitment)))
+					zap.Duration("took", time.Since(start)))
 
 				// Requesting each slot
 				for slot := rangeStart; slot <= rangeEnd; slot++ {
@@ -248,11 +250,14 @@ func (s *SolanaWatcher) fetchBlock(ctx context.Context, logger *zap.Logger, slot
 	defer cancel()
 	start := time.Now()
 	rewards := false
-	out, err := s.rpcClient.GetConfirmedBlockWithOpts(rCtx, slot, &rpc.GetConfirmedBlockOpts{
-		Encoding:           "json",
-		TransactionDetails: "full",
-		Rewards:            &rewards,
-		Commitment:         s.commitment,
+
+	maxSupportedTransactionVersion := uint64(0)
+	out, err := s.rpcClient.GetBlockWithOpts(rCtx, slot, &rpc.GetBlockOpts{
+		Encoding:                       solana.EncodingBase64, // solana-go doesn't support json encoding.
+		TransactionDetails:             "full",
+		Rewards:                        &rewards,
+		Commitment:                     s.commitment,
+		MaxSupportedTransactionVersion: &maxSupportedTransactionVersion,
 	})
 
 	queryLatency.WithLabelValues(s.networkName, "get_confirmed_block", string(s.commitment)).Observe(time.Since(start).Seconds())
@@ -290,24 +295,42 @@ func (s *SolanaWatcher) fetchBlock(ctx context.Context, logger *zap.Logger, slot
 	}
 
 	if out == nil {
-		solanaConnectionErrors.WithLabelValues(s.networkName, string(s.commitment), "get_confirmed_block_error").Inc()
-		logger.Error("nil response when requesting block", zap.Error(err), zap.Uint64("slot", slot),
-			zap.String("commitment", string(s.commitment)))
-		p2p.DefaultRegistry.AddErrorCount(s.chainID, 1)
+		// Per the API, nil just means the block is not confirmed.
+		logger.Info("block is not yet finalized", zap.Uint64("slot", slot))
 		return false
 	}
 
-	logger.Info("fetched block",
+	logger.Debug("fetched block",
 		zap.Uint64("slot", slot),
 		zap.Int("num_tx", len(out.Transactions)),
 		zap.Duration("took", time.Since(start)),
 		zap.String("commitment", string(s.commitment)))
 
+	s.updateLatestBlock(slot)
+
 OUTER:
-	for _, tx := range out.Transactions {
-		signature := tx.Transaction.Signatures[0]
+	for txNum, txRpc := range out.Transactions {
+		if txRpc.Meta.Err != nil {
+			logger.Debug("Transaction failed, skipping it",
+				zap.Uint64("slot", slot),
+				zap.Int("txNum", txNum),
+				zap.String("err", fmt.Sprint(txRpc.Meta.Err)),
+			)
+			continue
+		}
+		tx, err := txRpc.GetTransaction()
+		if err != nil {
+			logger.Error("failed to unmarshal transaction",
+				zap.Uint64("slot", slot),
+				zap.Int("txNum", txNum),
+				zap.Int("dataLen", len(txRpc.Transaction.GetBinary())),
+				zap.Error(err),
+			)
+			continue
+		}
+		signature := tx.Signatures[0]
 		var programIndex uint16
-		for n, key := range tx.Transaction.Message.AccountKeys {
+		for n, key := range tx.Message.AccountKeys {
 			if key.Equals(s.contract) {
 				programIndex = uint16(n)
 			}
@@ -316,7 +339,7 @@ OUTER:
 			continue
 		}
 
-		if tx.Meta.Err != nil {
+		if txRpc.Meta.Err != nil {
 			logger.Debug("skipping failed Wormhole transaction",
 				zap.Stringer("signature", signature),
 				zap.Uint64("slot", slot),
@@ -324,13 +347,13 @@ OUTER:
 			continue
 		}
 
-		logger.Info("found Wormhole transaction",
+		logger.Debug("found Wormhole transaction",
 			zap.Stringer("signature", signature),
 			zap.Uint64("slot", slot),
 			zap.String("commitment", string(s.commitment)))
 
 		// Find top-level instructions
-		for i, inst := range tx.Transaction.Message.Instructions {
+		for i, inst := range tx.Message.Instructions {
 			found, err := s.processInstruction(ctx, logger, slot, inst, programIndex, tx, signature, i)
 			if err != nil {
 				logger.Error("malformed Wormhole instruction",
@@ -350,9 +373,11 @@ OUTER:
 		// Call GetConfirmedTransaction to get at innerTransactions
 		rCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
 		start := time.Now()
-		tr, err := s.rpcClient.GetConfirmedTransactionWithOpts(rCtx, signature, &rpc.GetTransactionOpts{
-			Encoding:   "json",
-			Commitment: s.commitment,
+		maxSupportedTransactionVersion := uint64(0)
+		tr, err := s.rpcClient.GetTransaction(rCtx, signature, &rpc.GetTransactionOpts{
+			Encoding:                       solana.EncodingBase64, // solana-go doesn't support json encoding.
+			Commitment:                     s.commitment,
+			MaxSupportedTransactionVersion: &maxSupportedTransactionVersion,
 		})
 		cancel()
 		queryLatency.WithLabelValues(s.networkName, "get_confirmed_transaction", string(s.commitment)).Observe(time.Since(start).Seconds())
@@ -367,7 +392,7 @@ OUTER:
 			return false
 		}
 
-		logger.Info("fetched transaction",
+		logger.Debug("fetched transaction",
 			zap.Uint64("slot", slot),
 			zap.String("commitment", string(s.commitment)),
 			zap.Stringer("signature", signature),
@@ -375,7 +400,7 @@ OUTER:
 
 		for _, inner := range tr.Meta.InnerInstructions {
 			for i, inst := range inner.Instructions {
-				_, err := s.processInstruction(ctx, logger, slot, inst, programIndex, tx, signature, i)
+				_, err = s.processInstruction(ctx, logger, slot, inst, programIndex, tx, signature, i)
 				if err != nil {
 					logger.Error("malformed Wormhole instruction",
 						zap.Error(err),
@@ -398,7 +423,7 @@ OUTER:
 	return true
 }
 
-func (s *SolanaWatcher) processInstruction(ctx context.Context, logger *zap.Logger, slot uint64, inst solana.CompiledInstruction, programIndex uint16, tx rpc.TransactionWithMeta, signature solana.Signature, idx int) (bool, error) {
+func (s *SolanaWatcher) processInstruction(ctx context.Context, logger *zap.Logger, slot uint64, inst solana.CompiledInstruction, programIndex uint16, tx *solana.Transaction, signature solana.Signature, idx int) (bool, error) {
 	if inst.ProgramIDIndex != programIndex {
 		return false, nil
 	}
@@ -422,7 +447,7 @@ func (s *SolanaWatcher) processInstruction(ctx context.Context, logger *zap.Logg
 		return false, fmt.Errorf("failed to deserialize instruction data: %w", err)
 	}
 
-	logger.Info("post message data", zap.Any("deserialized_data", data),
+	logger.Debug("post message data", zap.Any("deserialized_data", data),
 		zap.Stringer("signature", signature), zap.Uint64("slot", slot), zap.Int("idx", idx))
 
 	level, err := data.ConsistencyLevel.Commitment()
@@ -435,9 +460,9 @@ func (s *SolanaWatcher) processInstruction(ctx context.Context, logger *zap.Logg
 	}
 
 	// The second account in a well-formed Wormhole instruction is the VAA program account.
-	acc := tx.Transaction.Message.AccountKeys[inst.Accounts[1]]
+	acc := tx.Message.AccountKeys[inst.Accounts[1]]
 
-	logger.Info("fetching VAA account", zap.Stringer("acc", acc),
+	logger.Debug("fetching VAA account", zap.Stringer("acc", acc),
 		zap.Stringer("signature", signature), zap.Uint64("slot", slot), zap.Int("idx", idx))
 
 	go s.retryFetchMessageAccount(ctx, logger, acc, slot, 0)
@@ -513,7 +538,7 @@ func (s *SolanaWatcher) fetchMessageAccount(ctx context.Context, logger *zap.Log
 		return false
 	}
 
-	logger.Info("found valid VAA account",
+	logger.Debug("found valid VAA account",
 		zap.Uint64("slot", slot),
 		zap.String("commitment", string(s.commitment)),
 		zap.Stringer("account", acc),
@@ -562,7 +587,7 @@ func (s *SolanaWatcher) processMessageAccount(logger *zap.Logger, data []byte, a
 
 	solanaMessagesConfirmed.WithLabelValues(s.networkName).Inc()
 
-	logger.Info("message observed",
+	logger.Debug("message observed",
 		zap.Stringer("account", acc),
 		zap.Time("timestamp", observation.Timestamp),
 		zap.Uint32("nonce", observation.Nonce),
@@ -574,6 +599,23 @@ func (s *SolanaWatcher) processMessageAccount(logger *zap.Logger, data []byte, a
 	)
 
 	s.messageEvent <- observation
+}
+
+// updateLatestBlock() updates the latest block number if the slot passed in is greater than the previous value.
+// This check is necessary because blocks can be posted out of order, due to multi threading in this watcher.
+func (s *SolanaWatcher) updateLatestBlock(slot uint64) {
+	s.latestBlockNumberMu.Lock()
+	defer s.latestBlockNumberMu.Unlock()
+	if slot > s.latestBlockNumber {
+		s.latestBlockNumber = slot
+	}
+}
+
+// GetLatestFinalizedBlockNumber() returns the latest published block.
+func (s *SolanaWatcher) GetLatestFinalizedBlockNumber() uint64 {
+	s.latestBlockNumberMu.Lock()
+	defer s.latestBlockNumberMu.Unlock()
+	return s.latestBlockNumber
 }
 
 type (

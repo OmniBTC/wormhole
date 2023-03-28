@@ -1,4 +1,11 @@
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  Commitment,
+  Connection,
+  Keypair,
+  PublicKey,
+  PublicKeyInitData,
+  Transaction,
+} from "@solana/web3.js";
 import { MsgExecuteContract } from "@terra-money/terra.js";
 import { MsgExecuteContract as MsgExecuteContractInjective } from "@injectivelabs/sdk-ts";
 import {
@@ -13,14 +20,15 @@ import {
 } from "algosdk";
 import BN from "bn.js";
 import { ethers, PayableOverrides } from "ethers";
-import { isNativeDenom } from "..";
+import { isNativeDenom } from "../terra";
 import { getMessageFee, optin, TransactionSignerPair } from "../algorand";
 import { Bridge__factory } from "../ethers-contracts";
-import { getBridgeFeeIx, ixFromRust } from "../solana";
-import { importTokenWasm } from "../solana/wasm";
+import { createBridgeFeeTransferInstruction } from "../solana";
+import { createAttestTokenInstruction } from "../solana/tokenBridge";
 import {
   callFunctionNear,
   hashAccount,
+  ChainId,
   textToHexString,
   textToUint8Array,
   uint8ArrayToHex,
@@ -32,6 +40,8 @@ import { isNativeDenomInjective, isNativeDenomXpla } from "../cosmwasm";
 import { Provider } from "near-api-js/lib/providers";
 import { FunctionCallOptions } from "near-api-js/lib/account";
 import { MsgExecuteContract as XplaMsgExecuteContract } from "@xpla/xpla.js";
+import { Types } from "aptos";
+import { attestToken as attestTokenAptos } from "../aptos";
 
 export async function attestFromEth(
   tokenBridgeAddress: string,
@@ -128,31 +138,29 @@ export function attestFromXpla(
 
 export async function attestFromSolana(
   connection: Connection,
-  bridgeAddress: string,
-  tokenBridgeAddress: string,
-  payerAddress: string,
-  mintAddress: string
+  bridgeAddress: PublicKeyInitData,
+  tokenBridgeAddress: PublicKeyInitData,
+  payerAddress: PublicKeyInitData,
+  mintAddress: PublicKeyInitData,
+  commitment?: Commitment
 ): Promise<Transaction> {
   const nonce = createNonce().readUInt32LE(0);
-  const transferIx = await getBridgeFeeIx(
+  const transferIx = await createBridgeFeeTransferInstruction(
     connection,
     bridgeAddress,
     payerAddress
   );
-  const { attest_ix } = await importTokenWasm();
   const messageKey = Keypair.generate();
-  const ix = ixFromRust(
-    attest_ix(
-      tokenBridgeAddress,
-      bridgeAddress,
-      payerAddress,
-      messageKey.publicKey.toString(),
-      mintAddress,
-      nonce
-    )
+  const attestIx = createAttestTokenInstruction(
+    tokenBridgeAddress,
+    bridgeAddress,
+    payerAddress,
+    mintAddress,
+    messageKey.publicKey,
+    nonce
   );
-  const transaction = new Transaction().add(transferIx, ix);
-  const { blockhash } = await connection.getRecentBlockhash();
+  const transaction = new Transaction().add(transferIx, attestIx);
+  const { blockhash } = await connection.getLatestBlockhash(commitment);
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = new PublicKey(payerAddress);
   transaction.partialSign(messageKey);
@@ -318,4 +326,19 @@ export async function attestNearFromNear(
     attachedDeposit: new BN(messageFee),
     gas: new BN("100000000000000"),
   };
+}
+
+/**
+ * Attest given token from Aptos.
+ * @param tokenBridgeAddress Address of token bridge
+ * @param tokenChain Origin chain ID
+ * @param tokenAddress Address of token on origin chain
+ * @returns Transaction payload
+ */
+export function attestFromAptos(
+  tokenBridgeAddress: string,
+  tokenChain: ChainId,
+  tokenAddress: string
+): Types.EntryFunctionPayload {
+  return attestTokenAptos(tokenBridgeAddress, tokenChain, tokenAddress);
 }

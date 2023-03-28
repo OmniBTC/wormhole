@@ -45,15 +45,6 @@ module.exports = {
       },
       network_id: "5",
     },
-    ropsten_testnet: {
-      provider: () => {
-        return new HDWalletProvider(
-          process.env.MNEMONIC,
-          "https://rpc.ankr.com/eth_ropsten"
-        );
-      },
-      network_id: "3",
-    },
     bsc: {
       provider: () => {
         return new HDWalletProvider(
@@ -209,8 +200,9 @@ module.exports = {
         );
       },
       network_id: 787,
-      gasPrice: "0x2f3e3403ea",
-      gas: "0x6fc3540",
+      gasPrice: "0x33a70303ea",
+      gasLimit: "0x6fc3540",
+      gas: "0x6fc3400",
     },
     acala_testnet: {
       provider: () => {

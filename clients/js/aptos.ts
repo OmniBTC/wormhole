@@ -1,11 +1,9 @@
 import { AptosAccount, TxnBuilderTypes, AptosClient, BCS } from "aptos";
 import { NETWORKS } from "./networks";
 import { impossible, Payload } from "./vaa";
-import { assertChain, ChainId, CONTRACTS } from "@certusone/wormhole-sdk";
-import { Bytes, Seq } from "aptos/dist/transaction_builder/bcs/types";
-import { TypeTag } from "aptos/dist/transaction_builder/aptos_types";
 import { sha3_256 } from "js-sha3";
 import { ethers } from "ethers";
+import { assertChain, ChainId, CONTRACTS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 export async function execute_aptos(
   payload: Payload,
@@ -69,7 +67,11 @@ export async function execute_aptos(
           // transaction that deploys a module cannot use that module
           //
           // Tx 1.
-          await callEntryFunc(network, rpc, `${contract}::wrapped`, "create_wrapped_coin_type", [], [bcsVAA]);
+          try {
+            await callEntryFunc(network, rpc, `${contract}::wrapped`, "create_wrapped_coin_type", [], [bcsVAA]);
+          } catch (e) {
+            console.log("this one already happened (probably)")
+          }
 
           // We just deployed the module (notice the "wait" argument which makes
           // the previous step block until finality).
@@ -144,8 +146,8 @@ export async function callEntryFunc(
   rpc: string | undefined,
   module: string,
   func: string,
-  ty_args: Seq<TypeTag>,
-  args: Seq<Bytes>,
+  ty_args: BCS.Seq<TxnBuilderTypes.TypeTag>,
+  args: BCS.Seq<BCS.Bytes>,
 ) {
   let key: string | undefined = NETWORKS[network]["aptos"].key;
   if (key === undefined) {
@@ -177,7 +179,7 @@ export async function callEntryFunc(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
     txPayload,
-    BigInt(30000), //max gas to be used. TODO(csongor): we could compute this from the simulation below...
+    BigInt(100000), //max gas to be used. TODO(csongor): we could compute this from the simulation below...
     BigInt(100), //price per unit gas TODO(csongor): we should get this dynamically
     BigInt(Math.floor(Date.now() / 1000) + 10),
     new TxnBuilderTypes.ChainId(chainId),

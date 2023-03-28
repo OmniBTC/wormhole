@@ -11,9 +11,9 @@
 // drop that particular message...
 // </sigh>
 const info = console.info;
-console.info = function(x){
+console.info = function(x: string) {
   if (x != "secp256k1 unavailable, reverting to browser version") {
-    info(x)
+    info(x);
   }
 };
 
@@ -22,80 +22,53 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { fromBech32, toHex } from "@cosmjs/encoding";
-import { CONTRACTS as SDK_CONTRACTS } from "@certusone/wormhole-sdk";
-import {
-  isTerraChain,
-  assertEVMChain,
-  setDefaultWasm,
-  hexToUint8Array,
-  getEmitterAddressSolana,
-  getEmitterAddressTerra,
-  getEmitterAddressEth,
-  getEmitterAddressAlgorand,
-  getEmitterAddressNear,
-  isCosmWasmChain,
-} from "@certusone/wormhole-sdk";
-import { execute_solana } from "./solana";
-import {
-  execute_evm,
-  getImplementation,
-  hijack_evm,
-  query_contract_evm,
-  setStorageAt,
-} from "./evm";
-import { execute_terra } from "./terra";
-import { execute_aptos } from "./aptos";
-import { execute_near } from "./near";
 import * as vaa from "./vaa";
 import { impossible, Payload, serialiseVAA, VAA } from "./vaa";
-import {
-  assertChain,
-  ChainName,
-  CHAINS,
-  toChainName,
-  isEVMChain,
-  toChainId,
-  tryNativeToHexString,
-} from "@certusone/wormhole-sdk";
 import { ethers } from "ethers";
 import { NETWORKS } from "./networks";
 import base58 from "bs58";
-import { execute_algorand } from "./algorand";
-import { execute_injective } from "./injective";
-import { execute_xpla } from "./xpla";
+import { sha3_256 } from "js-sha3";
 import { isOutdated } from "./cmds/update";
+import { setDefaultWasm } from "@certusone/wormhole-sdk/lib/cjs/solana/wasm";
+import { assertChain, assertEVMChain, ChainName, CHAINS, CONTRACTS as SDK_CONTRACTS, isCosmWasmChain, isEVMChain, isTerraChain, toChainId, toChainName } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 setDefaultWasm("node");
 
 if (isOutdated()) {
-  console.error("\x1b[33m%s\x1b[0m", "WARNING: 'worm' is out of date. Run 'worm update' to update.");
+  console.error(
+    "\x1b[33m%s\x1b[0m",
+    "WARNING: 'worm' is out of date. Run 'worm update' to update."
+  );
 }
 
 const GOVERNANCE_CHAIN = 1;
 const GOVERNANCE_EMITTER =
   "0000000000000000000000000000000000000000000000000000000000000004";
 
-// TODO: put this into the sdk when things have finalised
+// TODO: remove this once the aptos SDK changes are merged in
 const OVERRIDES = {
   MAINNET: {
     aptos: {
-      token_bridge: "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
-      core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625"
-    }
+      token_bridge:
+        "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
+      core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625",
+    },
   },
   TESTNET: {
     aptos: {
-      token_bridge: "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
-      core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625"
-    }
+      token_bridge:
+        "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
+      core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625",
+    },
   },
   DEVNET: {
     aptos: {
-      token_bridge: "0x84a5f374d29fc77e370014dce4fd6a55b58ad608de8074b0be5571701724da31",
-      core: "0xde0036a9600559e295d5f6802ef6f3f802f510366e0c23912b0655d972166017"
-    }
-  }
-}
+      token_bridge:
+        "0x84a5f374d29fc77e370014dce4fd6a55b58ad608de8074b0be5571701724da31",
+      core: "0xde0036a9600559e295d5f6802ef6f3f802f510366e0c23912b0655d972166017",
+    },
+  },
+};
 
 export const CONTRACTS = {
   MAINNET: { ...SDK_CONTRACTS.MAINNET, ...OVERRIDES.MAINNET },
@@ -127,7 +100,7 @@ function makeVAA(
 
 yargs(hideBin(process.argv))
   //TODO(csongor): refactor all commands into the directory structure.
-  .commandDir('cmds')
+  .commandDir("cmds")
   ////////////////////////////////////////////////////////////////////////////////
   // Generate
   .command(
@@ -310,12 +283,15 @@ yargs(hideBin(process.argv))
                 type: "AttestMeta",
                 chain: 0,
                 // TODO: remove these casts (only here because of the workaround above)
-                tokenAddress: parseAddress(argv["chain"], argv["token-address"] as string),
+                tokenAddress: parseAddress(
+                  argv["chain"],
+                  argv["token-address"] as string
+                ),
                 tokenChain: toChainId(argv["chain"]),
                 decimals: argv["decimals"] as number,
                 symbol: argv["symbol"] as string,
-                name: argv["name"] as string
-              }
+                name: argv["name"] as string,
+              };
               let v = makeVAA(
                 toChainId(emitter_chain),
                 parseAddress(emitter_chain, argv["emitter-address"] as string),
@@ -436,17 +412,18 @@ yargs(hideBin(process.argv))
           impossible(module);
       }
       if (argv["emitter"]) {
+        const emitter = require("@certusone/wormhole-sdk/lib/cjs/bridge/getEmitterAddress")
         if (chain === "solana" || chain === "pythnet") {
           // TODO: Create an isSolanaChain()
-          addr = await getEmitterAddressSolana(addr);
+          addr = await emitter.getEmitterAddressSolana(addr);
         } else if (isCosmWasmChain(chain)) {
-          addr = await getEmitterAddressTerra(addr);
+          addr = await emitter.getEmitterAddressTerra(addr);
         } else if (chain === "algorand") {
-          addr = getEmitterAddressAlgorand(BigInt(addr));
+          addr = emitter.getEmitterAddressAlgorand(BigInt(addr));
         } else if (chain === "near") {
-          addr = await getEmitterAddressNear(addr);
+          addr = emitter.getEmitterAddressNear(addr);
         } else {
-          addr = getEmitterAddressEth(addr);
+          addr = emitter.getEmitterAddressEth(addr);
         }
       }
       console.log(addr);
@@ -497,11 +474,93 @@ yargs(hideBin(process.argv))
     }
   )
   ////////////////////////////////////////////////////////////////////////////////
+  // Near utilities
+  .command(
+    "near",
+    "NEAR utilites",
+    (yargs) => {
+      const near = require("./near")
+      return (
+        yargs
+          .option("module", {
+            alias: "m",
+            describe: "Module to query",
+            type: "string",
+            choices: ["Core", "NFTBridge", "TokenBridge"],
+            required: false,
+          })
+          .option("network", {
+            alias: "n",
+            describe: "network",
+            type: "string",
+            choices: ["mainnet", "testnet", "devnet"],
+            required: true,
+          })
+          .option("account", {
+            describe: "near deployment account",
+            type: "string",
+            required: true,
+          })
+          .option("attach", {
+            describe: "attach some near",
+            type: "string",
+            required: false,
+          })
+          .option("target", {
+            describe: "near account to upgrade",
+            type: "string",
+            required: false,
+          })
+          .option("mnemonic", {
+            describe: "near private keys",
+            type: "string",
+            required: false,
+          })
+          .option("keys", {
+            describe: "near private keys",
+            type: "string",
+            required: false,
+          })
+          .command(
+            "contract-update <file>",
+            "Submit a contract update using our specific APIs",
+            (yargs) => {
+              return yargs.positional("file", {
+                type: "string",
+                describe: "wasm",
+              });
+            },
+            async (argv) => {
+              await near.upgrade_near(argv);
+            }
+          )
+          .command(
+            "deploy <file>",
+            "Submit a contract update using near APIs",
+            (yargs) => {
+              return yargs.positional("file", {
+                type: "string",
+                describe: "wasm",
+              });
+            },
+            async (argv) => {
+              await near.deploy_near(argv);
+            }
+          )
+      );
+    },
+    (_) => {
+      yargs.showHelp();
+    }
+  )
+
+  ////////////////////////////////////////////////////////////////////////////////
   // Evm utilities
   .command(
     "evm",
     "EVM utilites",
     (yargs) => {
+      const evm = require("./evm")
       return yargs
         .option("rpc", {
           describe: "RPC endpoint",
@@ -546,7 +605,7 @@ yargs(hideBin(process.argv))
               });
           },
           async (argv) => {
-            const result = await setStorageAt(
+            const result = await evm.setStorageAt(
               argv["rpc"],
               evm_address(argv["contract-address"]),
               argv["storage-slot"],
@@ -619,7 +678,7 @@ yargs(hideBin(process.argv))
             let rpc = argv["rpc"] ?? NETWORKS[network][argv["chain"]].rpc;
             if (argv["implementation-only"]) {
               console.log(
-                await getImplementation(
+                await evm.getImplementation(
                   network,
                   argv["chain"],
                   module,
@@ -630,7 +689,7 @@ yargs(hideBin(process.argv))
             } else {
               console.log(
                 JSON.stringify(
-                  await query_contract_evm(
+                  await evm.query_contract_evm(
                     network,
                     argv["chain"],
                     module,
@@ -672,7 +731,7 @@ yargs(hideBin(process.argv))
           async (argv) => {
             const guardian_addresses = argv["guardian-address"].split(",");
             let rpc = argv["rpc"] ?? NETWORKS.DEVNET.ethereum.rpc;
-            await hijack_evm(
+            await evm.hijack_evm(
               rpc,
               argv["core-contract-address"],
               guardian_addresses,
@@ -691,6 +750,7 @@ yargs(hideBin(process.argv))
     "submit <vaa>",
     "Execute a VAA",
     (yargs) => {
+      // @ts-ignore
       return yargs
         .positional("vaa", {
           describe: "vaa",
@@ -780,7 +840,8 @@ yargs(hideBin(process.argv))
           "This VAA does not specify the target chain, please provide it by hand using the '--chain' flag."
         );
       } else if (isEVMChain(chain)) {
-        await execute_evm(
+        const evm = require("./evm")
+        await evm.execute_evm(
           parsed_vaa.payload,
           buf,
           network,
@@ -789,29 +850,42 @@ yargs(hideBin(process.argv))
           argv["rpc"]
         );
       } else if (isTerraChain(chain)) {
-        await execute_terra(parsed_vaa.payload, buf, network, chain);
+        const terra = require("./terra")
+        await terra.execute_terra(parsed_vaa.payload, buf, network, chain);
       } else if (chain === "solana" || chain === "pythnet") {
-        await execute_solana(parsed_vaa, buf, network, chain);
+        const solana = require("./solana")
+        await solana.execute_solana(parsed_vaa, buf, network, chain);
       } else if (chain === "algorand") {
-        await execute_algorand(
+        const algorand = require("./algorand")
+        await algorand.execute_algorand(
           parsed_vaa.payload,
-          hexToUint8Array(vaa_hex),
+          new Uint8Array(Buffer.from(vaa_hex, "hex")),
           network
         );
       } else if (chain === "near") {
-        await execute_near(parsed_vaa.payload, vaa_hex, network);
+        const near = require("./near")
+        await near.execute_near(parsed_vaa.payload, vaa_hex, network);
       } else if (chain === "injective") {
-        await execute_injective(parsed_vaa.payload, buf, network);
+        const injective = require("./injective")
+        await injective.execute_injective(parsed_vaa.payload, buf, network);
       } else if (chain === "xpla") {
-        await execute_xpla(parsed_vaa.payload, buf, network);
+        const xpla = require("./xpla")
+        await xpla.execute_xpla(parsed_vaa.payload, buf, network);
       } else if (chain === "osmosis") {
         throw Error("OSMOSIS is not supported yet");
       } else if (chain === "sui") {
         throw Error("SUI is not supported yet");
       } else if (chain === "aptos") {
-        await execute_aptos(parsed_vaa.payload, buf, network, argv["contract-address"], argv["rpc"]);
-      } else if (chain === "wormholechain") {
-        throw Error("Wormhole Chain is not supported yet");
+        const aptos = require("./aptos")
+        await aptos.execute_aptos(
+          parsed_vaa.payload,
+          buf,
+          network,
+          argv["contract-address"],
+          argv["rpc"]
+        );
+      } else if (chain === "wormchain") {
+        throw Error("Wormchain is not supported yet");
       } else {
         // If you get a type error here, hover over `chain`'s type and it tells you
         // which cases are not handled
@@ -820,8 +894,7 @@ yargs(hideBin(process.argv))
     }
   )
   .strict()
-  .demandCommand()
-  .argv;
+  .demandCommand().argv;
 
 function hex(x: string): string {
   return ethers.utils.hexlify(x, { allowMissingPrefix: true });
@@ -850,17 +923,21 @@ function parseAddress(chain: ChainName, address: string): string {
   } else if (chain === "sui") {
     throw Error("SUI is not supported yet");
   } else if (chain === "aptos") {
-    // TODO: is there a better native format for aptos?
-    return "0x" + evm_address(address);
-  } else if (chain === "wormholechain") {
-    return "0x" + tryNativeToHexString(address, chain);
+    if (/^(0x)?[0-9a-fA-F]+$/.test(address)) {
+      return "0x" + evm_address(address);
+    }
+    
+    return sha3_256(Buffer.from(address)); // address is hash of fully qualified type
+  } else if (chain === "wormchain") {
+    const sdk = require("@certusone/wormhole-sdk/lib/cjs/utils/array")
+    return "0x" + sdk.tryNativeToHexString(address, chain);
   } else {
     impossible(chain);
   }
 }
 
 function parseCodeAddress(chain: ChainName, address: string): string {
-  if (isTerraChain(chain)) {
+  if (isCosmWasmChain(chain)) {
     return "0x" + parseInt(address, 10).toString(16).padStart(64, "0");
   } else {
     return parseAddress(chain, address);

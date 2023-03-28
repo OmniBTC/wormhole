@@ -1,6 +1,57 @@
 # Changelog
 
+## 0.9.3
+
+Fix `transferFromSolana`, `transferNativeSol` and `redeemOnSolana` for Token Bridge.
+
+## 0.9.1
+
+### Added
+
+queryExternalIdInjective
+
+parseSmartContractStateResponse
+
+## 0.9.0
+
+### Added
+
+Methods to create transaction instructions for Wormhole (Core Bridge), Token Bridge and NFT Bridge
+
+Methods to generate PDAs for Wormhole (Core Bridge), Token Bridge and NFT Bridge
+
+Methods to deserialize account data for Wormhole (Core Bridge), Token Bridge and NFT Bridge
+
+Other Solana utility objects and methods
+
+VAA (Verified Wormhole Message) deserializers
+
+Optional Confirmation arguments for account retrieval and wherever they are relevant
+
+Mock objects to be used in local integration tests (e.g. MockGuardians)
+
+### Changed
+
+Use FQTs in Aptos SDK
+
+### Removed
+
+Dependency: @certusone/wormhole-sdk-wasm
+
+Removed support for Ropsten since the chain has been deprecated.
+
+## 0.8.0
+
+### Added
+
+Aptos support
+
+### Changed
+
+Wormchain rename
+
 ## 0.7.2
+
 ### Added
 
 XPLA mainnet support and functions

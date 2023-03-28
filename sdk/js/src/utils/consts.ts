@@ -27,8 +27,8 @@ export const CHAINS = {
   gnosis: 25,
   pythnet: 26,
   xpla: 28,
-  ropsten: 10001,
-  wormholechain: 3104,
+  btc: 29,
+  wormchain: 3104,
 } as const;
 
 export type ChainName = keyof typeof CHAINS;
@@ -55,7 +55,8 @@ export type EVMChainName =
   | "arbitrum"
   | "optimism"
   | "gnosis"
-  | "ropsten";
+  ;
+
 /**
  *
  * All the Solana-based chain names that Wormhole supports
@@ -74,6 +75,8 @@ export type Contracts = {
 export type ChainContracts = {
   [chain in ChainName]: Contracts;
 };
+
+export type Network = "MAINNET" | "TESTNET" | "DEVNET";
 
 const MAINNET = {
   unset: {
@@ -167,8 +170,9 @@ const MAINNET = {
     nft_bridge: undefined,
   },
   aptos: {
-    core: undefined,
-    token_bridge: undefined,
+    core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625",
+    token_bridge:
+      "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
     nft_bridge: undefined,
   },
   sui: {
@@ -194,13 +198,13 @@ const MAINNET = {
   },
   arbitrum: {
     core: "0xa5f208e072434bC67592E4C49C1B991BA79BCA46",
-    token_bridge: undefined,
-    nft_bridge: undefined,
+    token_bridge: "0x0b2402144Bb366A632D14B83F244D2e0e21bD39c",
+    nft_bridge: "0x3dD14D553cFD986EAC8e3bddF629d82073e188c8",
   },
   optimism: {
     core: "0xEe91C335eab126dF5fDB3797EA9d6aD93aeC9722",
-    token_bridge: undefined,
-    nft_bridge: undefined,
+    token_bridge: "0x1D68124e65faFC907325e3EDbF8c4d84499DAa8b",
+    nft_bridge: "0xfE8cD454b4A1CA468B57D79c0cc77Ef5B6f64585",
   },
   gnosis: {
     core: "0xa321448d90d4e5b0A732867c18eA198e75CAC48E",
@@ -214,15 +218,16 @@ const MAINNET = {
   },
   xpla: {
     core: "xpla1jn8qmdda5m6f6fqu9qv46rt7ajhklg40ukpqchkejcvy8x7w26cqxamv3w",
-    token_bridge: "xpla137w0wfch2dfmz7jl2ap8pcmswasj8kg06ay4dtjzw7tzkn77ufxqfw7acv",
+    token_bridge:
+      "xpla137w0wfch2dfmz7jl2ap8pcmswasj8kg06ay4dtjzw7tzkn77ufxqfw7acv",
     nft_bridge: undefined,
   },
-  ropsten: {
+  btc: {
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
   },
-  wormholechain: {
+  wormchain: {
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
@@ -321,8 +326,9 @@ const TESTNET = {
     nft_bridge: undefined,
   },
   aptos: {
-    core: undefined,
-    token_bridge: undefined,
+    core: "0x5bc11445584a763c1fa7ed39081f1b920954da14e04b32440cba863d03e19625",
+    token_bridge:
+      "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
     nft_bridge: undefined,
   },
   sui: {
@@ -372,12 +378,12 @@ const TESTNET = {
       "xpla1kek6zgdaxcsu35nqfsyvs2t9vs87dqkkq6hjdgczacysjn67vt8sern93x",
     nft_bridge: undefined,
   },
-  ropsten: {
-    core: "0x210c5F5e2AF958B4defFe715Dc621b7a3BA888c5",
-    token_bridge: "0xF174F9A837536C449321df1Ca093Bb96948D5386",
-    nft_bridge: "0x2b048Da40f69c8dc386a56705915f8E966fe1eba",
+  btc: {
+    core: undefined,
+    token_bridge: undefined,
+    nft_bridge: undefined,
   },
-  wormholechain: {
+  wormchain: {
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
@@ -476,8 +482,9 @@ const DEVNET = {
     nft_bridge: undefined,
   },
   aptos: {
-    core: undefined,
-    token_bridge: undefined,
+    core: "0xde0036a9600559e295d5f6802ef6f3f802f510366e0c23912b0655d972166017",
+    token_bridge:
+      "0x84a5f374d29fc77e370014dce4fd6a55b58ad608de8074b0be5571701724da31",
     nft_bridge: undefined,
   },
   sui: {
@@ -526,12 +533,12 @@ const DEVNET = {
     token_bridge: undefined,
     nft_bridge: undefined,
   },
-  ropsten: {
+  btc: {
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
   },
-  wormholechain: {
+  wormchain: {
     core: "wormhole1ap5vgur5zlgys8whugfegnn43emka567dtq0jl",
     token_bridge: "wormhole1zugu6cajc4z7ue29g9wnes9a5ep9cs7yu7rn3z",
     nft_bridge: undefined,
@@ -604,8 +611,8 @@ export const CHAIN_ID_OPTIMISM = CHAINS["optimism"];
 export const CHAIN_ID_GNOSIS = CHAINS["gnosis"];
 export const CHAIN_ID_PYTHNET = CHAINS["pythnet"];
 export const CHAIN_ID_XPLA = CHAINS["xpla"];
-export const CHAIN_ID_ETHEREUM_ROPSTEN = CHAINS["ropsten"];
-export const CHAIN_ID_WORMHOLE_CHAIN = CHAINS["wormholechain"];
+export const CHAIN_ID_BTC = CHAINS["btc"];
+export const CHAIN_ID_WORMCHAIN = CHAINS["wormchain"];
 
 // This inverts the [[CHAINS]] object so that we can look up a chain by id
 export type ChainIdToName = {
@@ -735,8 +742,7 @@ export function isEVMChain(
     chainId === CHAIN_ID_NEON ||
     chainId === CHAIN_ID_ARBITRUM ||
     chainId === CHAIN_ID_OPTIMISM ||
-    chainId === CHAIN_ID_GNOSIS ||
-    chainId === CHAIN_ID_ETHEREUM_ROPSTEN
+    chainId === CHAIN_ID_GNOSIS
   ) {
     return isEVM(chainId);
   } else {
@@ -781,6 +787,8 @@ export function assertEVMChain(
 export const WSOL_ADDRESS = "So11111111111111111111111111111111111111112";
 export const WSOL_DECIMALS = 9;
 export const MAX_VAA_DECIMALS = 8;
+export const APTOS_TOKEN_BRIDGE_EMITTER_ADDRESS =
+  "0000000000000000000000000000000000000000000000000000000000000001";
 
 export const TERRA_REDEEMED_CHECK_WALLET_ADDRESS =
   "terra1x46rqay4d3cssq8gxxvqz8xt6nwlz4td20k38v";

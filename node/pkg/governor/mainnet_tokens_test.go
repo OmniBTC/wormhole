@@ -14,7 +14,7 @@ func TestTokenListSize(t *testing.T) {
 
 	/* Assuming that governed tokens will need to be updated every time
 	   we regenerate it */
-	assert.Equal(t, 129, len(tokenConfigEntries))
+	assert.Equal(t, 133, len(tokenConfigEntries))
 }
 
 func TestTokenListAddressSize(t *testing.T) {
@@ -43,7 +43,7 @@ func TestTokenListChainTokensPresent(t *testing.T) {
 				}
 			}
 
-			if e != vaa.ChainIDXpla && e != vaa.ChainIDAptos {
+			if e != vaa.ChainIDXpla && e != vaa.ChainIDAptos && e != vaa.ChainIDArbitrum {
 				assert.Equal(t, found, true)
 			}
 		})
@@ -60,7 +60,7 @@ func TestTokenListTokenAddressDuplicates(t *testing.T) {
 		// Also using that as the map payload so if we do have a duplicate, we can print out something meaningful.
 		key := fmt.Sprintf("%v:%v", e.chain, e.addr)
 		assert.Equal(t, "", addrs[key])
-		addrs[key] = key
+		addrs[key] = key + ":" + e.symbol
 	}
 }
 

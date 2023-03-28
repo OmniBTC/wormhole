@@ -1,4 +1,4 @@
-import { ChainName } from "@certusone/wormhole-sdk";
+import { ChainName } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 require("dotenv").config({ path: `${process.env.HOME}/.wormhole/.env` });
 
@@ -94,8 +94,8 @@ const MAINNET = {
     key: undefined,
   },
   aptos: {
-    rpc: undefined,
-    key: undefined,
+    rpc: "https://fullnode.mainnet.aptoslabs.com/v1",
+    key: get_env_var("APTOS_KEY"),
   },
   sui: {
     rpc: undefined,
@@ -110,7 +110,11 @@ const MAINNET = {
     chain_id: "dimension_37-1",
     key: get_env_var("XPLA_KEY"),
   },
-  wormholechain: {
+  btc: {
+    rpc: undefined,
+    key: undefined,
+  },
+  wormchain: {
     rpc: undefined,
     key: undefined,
   },
@@ -139,10 +143,6 @@ const MAINNET = {
     rpc: "https://rpc.gnosischain.com/",
     key: get_env_var("ETH_KEY"),
   },
-  ropsten: {
-    rpc: `https://rpc.ankr.com/eth_ropsten`,
-    key: get_env_var("ETH_KEY"),
-  },
 };
 
 const TESTNET = {
@@ -157,7 +157,7 @@ const TESTNET = {
   terra: {
     rpc: "https://bombay-lcd.terra.dev",
     chain_id: "bombay-12",
-    key: get_env_var("TERRA_MNEMONIC"),
+    key: get_env_var("TERRA_MNEMONIC_TESTNET"),
   },
   ethereum: {
     rpc: `https://rpc.ankr.com/eth_goerli`,
@@ -240,7 +240,11 @@ const TESTNET = {
     chain_id: "cube_47-5",
     key: get_env_var("XPLA_KEY_TESTNET"),
   },
-  wormholechain: {
+  btc: {
+    rpc: undefined,
+    key: undefined,
+  },
+  wormchain: {
     rpc: undefined,
     key: undefined,
   },
@@ -267,10 +271,6 @@ const TESTNET = {
   },
   gnosis: {
     rpc: "https://sokol.poa.network/",
-    key: get_env_var("ETH_KEY_TESTNET"),
-  },
-  ropsten: {
-    rpc: `https://rpc.ankr.com/eth_ropsten`,
     key: get_env_var("ETH_KEY_TESTNET"),
   },
 };
@@ -355,14 +355,18 @@ const DEVNET = {
     rpc: undefined,
     key: undefined,
   },
+  btc: {
+    rpc: undefined,
+    key: undefined,
+  },
   xpla: {
     rpc: undefined,
     chain_id: undefined,
     key: undefined,
   },
-  wormholechain: {
+  wormchain: {
     rpc: "http://localhost:1319",
-    chain_id: "wormholechain",
+    chain_id: "wormchain",
     key: undefined,
   },
   aptos: {
@@ -397,10 +401,6 @@ const DEVNET = {
   gnosis: {
     rpc: undefined,
     key: undefined,
-  },
-  ropsten: {
-    rpc: undefined,
-    key: "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
   },
 };
 

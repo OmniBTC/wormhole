@@ -1,13 +1,27 @@
 import { ChainGrpcWasmApi } from "@injectivelabs/sdk-ts";
-import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  Commitment,
+  Connection,
+  PublicKey,
+  PublicKeyInitData,
+} from "@solana/web3.js";
 import { LCDClient } from "@terra-money/terra.js";
 import { Algodv2, getApplicationAddress } from "algosdk";
+import { AptosClient } from "aptos";
 import { ethers } from "ethers";
 import { Bridge__factory } from "../ethers-contracts";
-import { importTokenWasm } from "../solana/wasm";
-import { CHAIN_ID_INJECTIVE, tryNativeToHexString } from "../utils";
+import {
+  CHAIN_ID_INJECTIVE,
+  ensureHexPrefix,
+  coalesceModuleAddress,
+  tryNativeToHexString,
+} from "../utils";
+import { deriveWrappedMetaKey, getWrappedMeta } from "../solana/tokenBridge";
 import { safeBigIntToNumber } from "../utils/bigint";
-import { getForeignAssetInjective } from "./getForeignAsset";
+import {
+  getForeignAssetSolana,
+  getForeignAssetInjective,
+} from "./getForeignAsset";
 
 /**
  * Returns whether or not an asset address on Ethereum is a wormhole wrapped asset
@@ -65,25 +79,24 @@ export async function getIsWrappedAssetInjective(
  * @param connection
  * @param tokenBridgeAddress
  * @param mintAddress
+ * @param [commitment]
  * @returns
  */
-export async function getIsWrappedAssetSol(
+export async function getIsWrappedAssetSolana(
   connection: Connection,
-  tokenBridgeAddress: string,
-  mintAddress: string
+  tokenBridgeAddress: PublicKeyInitData,
+  mintAddress: PublicKeyInitData,
+  commitment?: Commitment
 ): Promise<boolean> {
-  if (!mintAddress) return false;
-  const { wrapped_meta_address } = await importTokenWasm();
-  const wrappedMetaAddress = wrapped_meta_address(
-    tokenBridgeAddress,
-    new PublicKey(mintAddress).toBytes()
-  );
-  const wrappedMetaAddressPK = new PublicKey(wrappedMetaAddress);
-  const wrappedMetaAccountInfo = await connection.getAccountInfo(
-    wrappedMetaAddressPK
-  );
-  return !!wrappedMetaAccountInfo;
+  if (!mintAddress) {
+    return false;
+  }
+  return getWrappedMeta(connection, tokenBridgeAddress, mintAddress, commitment)
+    .catch((_) => null)
+    .then((meta) => meta != null);
 }
+
+export const getIsWrappedAssetSol = getIsWrappedAssetSolana;
 
 /**
  * Returns whethor or not an asset on Algorand is a wormhole wrapped asset
@@ -113,4 +126,29 @@ export function getIsWrappedAssetNear(
   asset: string
 ): boolean {
   return asset.endsWith("." + tokenBridge);
+}
+
+/**
+ * Determines whether or not given address is wrapped or native to Aptos.
+ * @param client Client used to transfer data to/from Aptos node
+ * @param tokenBridgeAddress Address of token bridge
+ * @param assetFullyQualifiedType Fully qualified type of asset
+ * @returns True if asset is wrapped
+ */
+export async function getIsWrappedAssetAptos(
+  client: AptosClient,
+  tokenBridgeAddress: string,
+  assetFullyQualifiedType: string
+): Promise<boolean> {
+  assetFullyQualifiedType = ensureHexPrefix(assetFullyQualifiedType);
+  try {
+    // get origin info from asset address
+    await client.getAccountResource(
+      coalesceModuleAddress(assetFullyQualifiedType),
+      `${tokenBridgeAddress}::state::OriginInfo`
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }

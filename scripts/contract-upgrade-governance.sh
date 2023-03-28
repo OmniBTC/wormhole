@@ -174,6 +174,16 @@ case "$chain_name" in
     chain=15
     explorer="https://explorer.near.org/accounts/"
     ;;
+  arbitrum)
+    chain=23
+    explorer="https://arbiscan.io/address/"
+    evm=true
+    ;;
+  optimism)
+    chain=24
+    explorer="https://optimistic.etherscan.io/address/"
+    evm=true
+    ;;
   *)
     echo "Unknown chain: $chain_name" >&2
     exit 1
@@ -452,7 +462,7 @@ elif [ "$chain_name" = "terra" ]; then
 
 	\`\`\`shell
 	# $module
-	wormhole/terra$ ./verify -n mainnet $(terra_artifact) $terra_code_id
+	wormhole/terra$ ./verify -n mainnet -c $chain_name -w $(terra_artifact) -i $terra_code_id
 	\`\`\`
 EOF
 else

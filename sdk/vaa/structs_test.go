@@ -47,7 +47,7 @@ func TestChainIDFromString(t *testing.T) {
 		{input: "injective", output: ChainIDInjective},
 		{input: "arbitrum", output: ChainIDArbitrum},
 		{input: "xpla", output: ChainIDXpla},
-		{input: "ethereum-ropsten", output: ChainIDEthereumRopsten},
+		{input: "btc", output: ChainIDBtc},
 
 		{input: "Solana", output: ChainIDSolana},
 		{input: "Ethereum", output: ChainIDEthereum},
@@ -71,10 +71,11 @@ func TestChainIDFromString(t *testing.T) {
 		{input: "Terra2", output: ChainIDTerra2},
 		{input: "Injective", output: ChainIDInjective},
 		{input: "Arbitrum", output: ChainIDArbitrum},
+		{input: "Optimism", output: ChainIDOptimism},
 		{input: "XPLA", output: ChainIDXpla},
-		{input: "Ethereum-ropsten", output: ChainIDEthereumRopsten},
-		{input: "Wormholechain", output: ChainIDWormchain},
-		{input: "wormholechain", output: ChainIDWormchain},
+		{input: "BTC", output: ChainIDBtc},
+		{input: "Wormchain", output: ChainIDWormchain},
+		{input: "wormchain", output: ChainIDWormchain},
 	}
 
 	// Negative Test Cases
@@ -168,9 +169,10 @@ func TestChainId_String(t *testing.T) {
 		{input: 21, output: "sui"},
 		{input: 22, output: "aptos"},
 		{input: 23, output: "arbitrum"},
+		{input: 24, output: "optimism"},
 		{input: 28, output: "xpla"},
-		{input: 10001, output: "ethereum-ropsten"},
-		{input: 3104, output: "wormholechain"},
+		{input: 29, output: "btc"},
+		{input: 3104, output: "wormchain"},
 	}
 
 	for _, tc := range tests {
@@ -182,6 +184,24 @@ func TestChainId_String(t *testing.T) {
 
 func getVaa() VAA {
 	var payload = []byte{97, 97, 97, 97, 97, 97}
+	var governanceEmitter = Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4}
+
+	return VAA{
+		Version:          uint8(1),
+		GuardianSetIndex: uint32(1),
+		Signatures:       []*Signature{},
+		Timestamp:        time.Unix(0, 0),
+		Nonce:            uint32(1),
+		Sequence:         uint64(1),
+		ConsistencyLevel: uint8(32),
+		EmitterChain:     ChainIDSolana,
+		EmitterAddress:   governanceEmitter,
+		Payload:          payload,
+	}
+}
+
+func getEmptyPayloadVaa() VAA {
+	var payload = []byte{}
 	var governanceEmitter = Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4}
 
 	return VAA{
@@ -251,6 +271,14 @@ func TestMarshal(t *testing.T) {
 func TestUnmarshal(t *testing.T) {
 	vaaBytes := []byte{0x1, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x20, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61}
 	vaa1 := getVaa()
+	vaa2, err := Unmarshal(vaaBytes)
+	assert.Nil(t, err)
+	assert.Equal(t, &vaa1, vaa2)
+}
+
+func TestUnmarshalNoPayload(t *testing.T) {
+	vaaBytes := []byte{0x1, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x20}
+	vaa1 := getEmptyPayloadVaa()
 	vaa2, err := Unmarshal(vaaBytes)
 	assert.Nil(t, err)
 	assert.Equal(t, &vaa1, vaa2)

@@ -107,7 +107,7 @@ func (p *Processor) handleCleanup(ctx context.Context) {
 			}
 
 			hasSigs := len(s.signatures)
-			wantSigs := CalculateQuorum(len(gs.Keys))
+			wantSigs := vaa.CalculateQuorum(len(gs.Keys))
 			quorum := hasSigs >= wantSigs
 
 			var chain vaa.ChainID
@@ -211,7 +211,7 @@ func (p *Processor) handleCleanup(ctx context.Context) {
 				// network reached consensus without us. We don't know the correct guardian
 				// set, so we simply use the most recent one.
 				hasSigs := len(s.signatures)
-				wantSigs := CalculateQuorum(len(p.gs.Keys))
+				wantSigs := vaa.CalculateQuorum(len(p.gs.Keys))
 
 				p.logger.Info("expiring unsubmitted nil observation",
 					zap.String("digest", hash),
@@ -230,7 +230,6 @@ func (p *Processor) handleCleanup(ctx context.Context) {
 	oldestTime := time.Now().Add(-time.Hour)
 	for key, pe := range p.pythnetVaas {
 		if pe.updateTime.Before(oldestTime) {
-			p.logger.Info("PYTHNET: dropping old pythnet vaa", zap.String("message_id", key), zap.Stringer("updateTime", pe.updateTime))
 			delete(p.pythnetVaas, key)
 		}
 	}

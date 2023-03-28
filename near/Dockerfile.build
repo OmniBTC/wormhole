@@ -1,10 +1,5 @@
-FROM debian@sha256:2ce44bbc00a79113c296d9d25524e15d423b23303fdbbe20190d2f96e0aeb251 as near-contracts-build
+FROM ghcr.io/wormhole-foundation/near:0.2@sha256:c2089c5e93df2396d74f9c07e7cd3d76983fad97bddb202030ca442c2c00c3c2 AS near-contracts-build
 
-RUN apt-get update && apt-get install apt-utils && apt-get install -y python3 npm curl --no-install-recommends
-RUN apt-get install -y build-essential git
-
-ADD setup-rust.sh .
-RUN ./setup-rust.sh
 ADD . .
 RUN make clean
 RUN ./build-contracts.sh
@@ -13,4 +8,5 @@ FROM scratch AS near-contracts-export
 
 COPY --from=near-contracts-build /contracts/token-bridge/target/wasm32-unknown-unknown/release/near_token_bridge.wasm near_token_bridge.wasm
 COPY --from=near-contracts-build /contracts/wormhole/target/wasm32-unknown-unknown/release/near_wormhole.wasm near_wormhole.wasm
+COPY --from=near-contracts-build /contracts/ft/target/wasm32-unknown-unknown/release/near_ft.wasm near_ft.wasm
 

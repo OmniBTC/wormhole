@@ -39,43 +39,45 @@ config.define_string("webHost", False, "Public hostname for port forwards")
 
 # Components
 config.define_bool("near", False, "Enable Near component")
+config.define_bool("sui", False, "Enable Sui component")
+config.define_bool("btc", False, "Enable BTC component")
 config.define_bool("aptos", False, "Enable Aptos component")
 config.define_bool("algorand", False, "Enable Algorand component")
 config.define_bool("evm2", False, "Enable second Eth component")
 config.define_bool("solana", False, "Enable Solana component")
 config.define_bool("terra_classic", False, "Enable Terra Classic component")
 config.define_bool("terra2", False, "Enable Terra 2 component")
-config.define_bool("explorer", False, "Enable explorer component")
 config.define_bool("spy_relayer", False, "Enable spy relayer")
-config.define_bool("e2e", False, "Enable E2E testing stack")
 config.define_bool("ci_tests", False, "Enable tests runner component")
 config.define_bool("guardiand_debug", False, "Enable dlv endpoint for guardiand")
 config.define_bool("node_metrics", False, "Enable Prometheus & Grafana for Guardian metrics")
 config.define_bool("guardiand_governor", False, "Enable chain governor in guardiand")
+config.define_bool("wormchain", False, "Enable a wormchain node")
 config.define_bool("secondWormchain", False, "Enable a second wormchain node with different validator keys")
 
 cfg = config.parse()
 num_guardians = int(cfg.get("num", "1"))
 namespace = cfg.get("namespace", "wormhole")
-gcpProject = cfg.get("gcpProject", "local-dev")
-bigTableKeyPath = cfg.get("bigTableKeyPath", "./event_database/devnet_key.json")
+gcpProject = cfg.get("gcpProject", "")
+bigTableKeyPath = cfg.get("bigTableKeyPath", "")
 webHost = cfg.get("webHost", "localhost")
-algorand = cfg.get("algorand", True)
-near = cfg.get("near", True)
-aptos = cfg.get("aptos", True)
-evm2 = cfg.get("evm2", True)
-solana = cfg.get("solana", True)
-terra_classic = cfg.get("terra_classic", True)
-terra2 = cfg.get("terra2", True)
 ci = cfg.get("ci", False)
-explorer = cfg.get("explorer", ci)
+algorand = cfg.get("algorand", ci)
+near = cfg.get("near", ci)
+aptos = cfg.get("aptos", ci)
+sui = cfg.get("sui", False)
+evm2 = cfg.get("evm2", ci)
+solana = cfg.get("solana", ci)
+terra_classic = cfg.get("terra_classic", ci)
+terra2 = cfg.get("terra2", ci)
+wormchain = cfg.get("wormchain", ci)
 spy_relayer = cfg.get("spy_relayer", ci)
-e2e = cfg.get("e2e", ci)
 ci_tests = cfg.get("ci_tests", ci)
 guardiand_debug = cfg.get("guardiand_debug", False)
 node_metrics = cfg.get("node_metrics", False)
 guardiand_governor = cfg.get("guardiand_governor", False)
 secondWormchain = cfg.get("secondWormchain", False)
+btc = cfg.get("btc", False)
 
 if cfg.get("manual", False):
     trigger_mode = TRIGGER_MODE_MANUAL
@@ -90,20 +92,6 @@ if not ci:
 def k8s_yaml_with_ns(objects):
     return k8s_yaml(namespace_inject(objects, namespace))
 
-# protos
-
-proto_deps = ["./proto", "buf.yaml", "buf.gen.yaml"]
-
-local_resource(
-    name = "proto-gen",
-    deps = proto_deps,
-    cmd = "tilt docker build -- --target go-export -f Dockerfile.proto -o type=local,dest=node .",
-    env = {"DOCKER_BUILDKIT": "1"},
-    labels = ["protobuf"],
-    allow_parallel = True,
-    trigger_mode = trigger_mode,
-)
-
 local_resource(
     name = "const-gen",
     deps = ["scripts", "clients", "ethereum/.env.test"],
@@ -115,7 +103,7 @@ local_resource(
 
 # node
 
-if explorer:
+if bigTableKeyPath != "":
     k8s_yaml_with_ns(
         secret_yaml_generic(
             "node-bigtable-key",
@@ -159,8 +147,10 @@ def build_node_yaml():
                 container["command"] = command_with_dlv(container["command"])
                 container["command"] += ["--logLevel=debug"]
                 print(container["command"])
+            elif ci:
+                container["command"] += ["--logLevel=warn"]
 
-            if explorer:
+            if gcpProject != "":
                 container["command"] += [
                     "--bigTablePersistenceEnabled",
                     "--bigTableInstanceName",
@@ -183,6 +173,20 @@ def build_node_yaml():
                     "de0036a9600559e295d5f6802ef6f3f802f510366e0c23912b0655d972166017",
                     "--aptosHandle",
                     "0xde0036a9600559e295d5f6802ef6f3f802f510366e0c23912b0655d972166017::state::WormholeMessageHandle",
+                ]
+
+            if sui:
+                container["command"] += [
+                    "--suiRPC",
+                    "http://sui:9002",
+# In testnet and mainnet, you will need to also specify the suiPackage argument.  In Devnet, we subscribe to 
+# event traffic purely based on the account since that is the only thing that is deterministic.
+#                    "--suiPackage",
+#                    "0x.....",
+                    "--suiAccount",
+                    "0x2acab6bb0e4722e528291bc6ca4f097e18ce9331",
+                    "--suiWS",
+                    "sui:9001",
                 ]
 
             if evm2:
@@ -249,11 +253,19 @@ def build_node_yaml():
                     "wormhole.test.near"
                 ]
 
+            if wormchain:
+                container["command"] += [
+                    "--wormchainWS",
+                    "ws://guardian-validator:26657/websocket",
+                    "--wormchainLCD",
+                    "http://guardian-validator:1317"
+                ]
+
     return encode_yaml_stream(node_yaml)
 
 k8s_yaml_with_ns(build_node_yaml())
 
-guardian_resource_deps = ["proto-gen", "eth-devnet"]
+guardian_resource_deps = ["eth-devnet"]
 if evm2:
     guardian_resource_deps = guardian_resource_deps + ["eth-devnet2"]
 if solana:
@@ -268,6 +280,10 @@ if algorand:
     guardian_resource_deps = guardian_resource_deps + ["algorand"]
 if aptos:
     guardian_resource_deps = guardian_resource_deps + ["aptos"]
+if wormchain:
+    guardian_resource_deps = guardian_resource_deps + ["guardian-validator"]
+if sui:
+    guardian_resource_deps = guardian_resource_deps + ["sui"]
 
 k8s_resource(
     "guardian",
@@ -339,7 +355,7 @@ k8s_yaml_with_ns("devnet/spy.yaml")
 
 k8s_resource(
     "spy",
-    resource_deps = ["proto-gen", "guardian"],
+    resource_deps = ["guardian"],
     port_forwards = [
         port_forward(6061, container_port = 6060, name = "Debug/Status Server [:6061]", host = webHost),
         port_forward(7072, name = "Spy gRPC [:7072]", host = webHost),
@@ -427,8 +443,7 @@ if spy_relayer:
 
     docker_build(
         ref = "spy-relay-image",
-        context = ".",
-        only = ["./relayer/spy_relayer"],
+        context = "relayer/spy_relayer",
         dockerfile = "relayer/spy_relayer/Dockerfile",
         live_update = []
     )
@@ -437,7 +452,7 @@ if spy_relayer:
 
     k8s_resource(
         "spy-listener",
-        resource_deps = ["proto-gen", "guardian", "redis", "spy"],
+        resource_deps = ["guardian", "redis", "spy"],
         port_forwards = [
             port_forward(6062, container_port = 6060, name = "Debug/Status Server [:6062]", host = webHost),
             port_forward(4201, name = "REST [:4201]", host = webHost),
@@ -451,7 +466,7 @@ if spy_relayer:
 
     k8s_resource(
         "spy-relayer",
-        resource_deps = ["proto-gen", "guardian", "redis"],
+        resource_deps = ["guardian", "redis"],
         port_forwards = [
             port_forward(8083, name = "Prometheus [:8083]", host = webHost),
         ],
@@ -463,7 +478,7 @@ if spy_relayer:
 
     k8s_resource(
         "spy-wallet-monitor",
-        resource_deps = ["proto-gen", "guardian", "redis"],
+        resource_deps = ["guardian", "redis"],
         port_forwards = [
             port_forward(8084, name = "Prometheus [:8084]", host = webHost),
         ],
@@ -526,66 +541,13 @@ if ci_tests:
         "sdk-ci-tests",
         labels = ["ci"],
         trigger_mode = trigger_mode,
-        resource_deps = ["guardian"],
+        resource_deps = [], # testing/sdk.sh handles waiting for spy, not having deps gets the build earlier
     )
     k8s_resource(
         "spydk-ci-tests",
         labels = ["ci"],
         trigger_mode = trigger_mode,
-        resource_deps = ["guardian", "spy"],
-    )
-
-# e2e
-if e2e:
-    k8s_yaml_with_ns("devnet/e2e.yaml")
-
-    docker_build(
-        ref = "e2e",
-        context = "e2e",
-        dockerfile = "e2e/Dockerfile",
-        network = "host",
-    )
-
-    k8s_resource(
-        "e2e",
-        port_forwards = [
-            port_forward(6080, name = "VNC [:6080]", host = webHost, link_path = "/vnc_auto.html"),
-        ],
-        labels = ["ci"],
-        trigger_mode = trigger_mode,
-    )
-
-# bigtable
-if explorer:
-    k8s_yaml_with_ns("devnet/bigtable.yaml")
-
-    k8s_resource(
-        "bigtable-emulator",
-        port_forwards = [port_forward(8086, name = "BigTable clients [:8086]")],
-        labels = ["explorer"],
-        trigger_mode = trigger_mode,
-    )
-
-    k8s_resource(
-        "pubsub-emulator",
-        port_forwards = [port_forward(8085, name = "PubSub listeners [:8085]")],
-        labels = ["explorer"],
-    )
-
-    docker_build(
-        ref = "cloud-functions",
-        context = "./event_database",
-        dockerfile = "./event_database/functions_server/Dockerfile",
-        live_update = [
-            sync("./event_database/cloud_functions", "/app/cloud_functions"),
-        ],
-    )
-    k8s_resource(
-        "cloud-functions",
-        resource_deps = ["proto-gen", "bigtable-emulator", "pubsub-emulator"],
-        port_forwards = [port_forward(8090, name = "Cloud Functions [:8090]", host = webHost)],
-        labels = ["explorer"],
-        trigger_mode = trigger_mode,
+        resource_deps = [], # testing/spydk.sh handles waiting for spy, not having deps gets the build earlier
     )
 
 if terra_classic:
@@ -702,6 +664,29 @@ if algorand:
         trigger_mode = trigger_mode,
     )
 
+if sui:
+    k8s_yaml_with_ns("devnet/sui-devnet.yaml")
+
+    docker_build(
+        ref = "sui-node",
+        context = "sui",
+        dockerfile = "sui/Dockerfile",
+        ignore = ["./sui/sui.log*", "sui/sui.log*", "sui.log.*"],
+        only = ["Dockerfile", "scripts"],
+    )
+
+    k8s_resource(
+        "sui",
+        port_forwards = [
+            port_forward(9001, name = "WS [:9001]", host = webHost),
+            port_forward(9002, name = "RPC [:9002]", host = webHost),
+            port_forward(5003, name = "Faucet [:5003]", host = webHost),
+            port_forward(9184, name = "Prometheus [:9184]", host = webHost),
+        ],
+#        resource_deps = ["const-gen"],
+        labels = ["sui"],
+        trigger_mode = trigger_mode,
+    )
 
 if near:
     k8s_yaml_with_ns("devnet/near-devnet.yaml")
@@ -731,38 +716,58 @@ if near:
         trigger_mode = trigger_mode,
     )
 
-docker_build(
-    ref = "wormhole-chaind-image",
-    context = ".",
-    dockerfile = "./Dockerfile.wormchain",
-    only = [],
-    ignore = ["./wormhole_chain/testing", "./wormhole_chain/ts-sdk", "./wormhole_chain/design", "./wormhole_chain/vue", "./wormhole_chain/build/wormhole-chaind"],
-)
+if wormchain:
+    docker_build(
+        ref = "wormchaind-image",
+        context = ".",
+        dockerfile = "./Dockerfile.wormchain",
+        only = [],
+        ignore = ["./wormchain/testing", "./wormchain/ts-sdk", "./wormchain/design", "./wormchain/vue", "./wormchain/build/wormchaind"],
+    )
 
-k8s_yaml_with_ns("wormhole_chain/validators/kubernetes/wormchain-guardian-devnet.yaml")
-
-k8s_resource(
-    "guardian-validator",
-    port_forwards = [
-        port_forward(1319, container_port = 1317, name = "REST [:1319]", host = webHost),
-        port_forward(26659, container_port = 26657, name = "TENDERMINT [:26659]", host = webHost)
-    ],
-    resource_deps = [],
-    labels = ["wormchain"],
-    trigger_mode = trigger_mode,
-)
-
-if secondWormchain:
-    k8s_yaml_with_ns("wormhole_chain/validators/kubernetes/wormchain-validator2-devnet.yaml")
+    k8s_yaml_with_ns("wormchain/validators/kubernetes/wormchain-guardian-devnet.yaml")
 
     k8s_resource(
-        "second-validator",
+        "guardian-validator",
         port_forwards = [
-            port_forward(1320, container_port = 1317, name = "REST [:1320]", host = webHost),
-            port_forward(26660, container_port = 26657, name = "TENDERMINT [:26660]", host = webHost)
+            port_forward(1319, container_port = 1317, name = "REST [:1319]", host = webHost),
+            port_forward(26659, container_port = 26657, name = "TENDERMINT [:26659]", host = webHost)
         ],
         resource_deps = [],
         labels = ["wormchain"],
+        trigger_mode = trigger_mode,
+    )
+
+    if secondWormchain:
+        k8s_yaml_with_ns("wormchain/validators/kubernetes/wormchain-validator2-devnet.yaml")
+
+        k8s_resource(
+            "second-validator",
+            port_forwards = [
+                port_forward(1320, container_port = 1317, name = "REST [:1320]", host = webHost),
+                port_forward(26660, container_port = 26657, name = "TENDERMINT [:26660]", host = webHost)
+            ],
+            resource_deps = [],
+            labels = ["wormchain"],
+            trigger_mode = trigger_mode,
+        )
+
+if btc:
+    k8s_yaml_with_ns("devnet/btc-localnet.yaml")
+
+    docker_build(
+        ref = "btc-node",
+        context = "bitcoin",
+        dockerfile = "bitcoin/Dockerfile",
+        target = "bitcoin-build",
+    )
+
+    k8s_resource(
+        "btc",
+        port_forwards = [
+            port_forward(18556, name = "RPC [:18556]", host = webHost),
+        ],
+        labels = ["btc"],
         trigger_mode = trigger_mode,
     )
 

@@ -59,11 +59,6 @@ spec:
               name: node-rundir
             - mountPath: /tmp/mounted-keys
               name: node-keysdir
-          env:
-            - name: BIGTABLE_EMULATOR_HOST
-              value: bigtable-emulator:8086
-            - name: PUBSUB_EMULATOR_HOST
-              value: pubsub-emulator:8085
           command:
             - /guardiand
             - node
@@ -91,12 +86,16 @@ spec:
             - ws://eth-devnet:8545
             - --moonbeamRPC
             - ws://eth-devnet:8545
+            - --arbitrumRPC
+            - ws://eth-devnet:8545
+            - --optimismRPC
+            - ws://eth-devnet:8545
             - --neonRPC
             - ws://eth-devnet:8545
-            - --wormchainWS
-            - ws://guardian-validator:26657/websocket
-            - --wormchainLCD
-            - http://guardian-validator:1317
+            # - --wormchainWS
+            # - ws://guardian-validator:26657/websocket
+            # - --wormchainLCD
+            # - http://guardian-validator:1317
             # - --terraWS
             # - ws://terra-terrad:26657/websocket
             # - --terraLCD
@@ -140,6 +139,8 @@ spec:
             - "[::]:7071"
             - --adminSocket
             - /tmp/admin.sock
+            - --publicGRPCSocket
+            - /tmp/publicrpc.sock
             - --dataDir
             - /tmp/data
           # - --chainGovernorEnabled=true
