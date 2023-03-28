@@ -32,7 +32,7 @@ module wormhole::setup {
         let upgrade_cap = package::mock_new_upgrade_cap(
             object::id_from_address(@wormhole), ctx
         );
-        transfer::transfer(upgrade_cap, tx_context::sender(ctx));
+        transfer::public_transfer(upgrade_cap, tx_context::sender(ctx));
     }
 
     #[test_only]
@@ -57,7 +57,7 @@ module wormhole::setup {
         object::delete(id);
 
         // Share new state.
-        transfer::share_object(
+        transfer::public_share_object(
             state::new(
                 upgrade_cap,
                 governance_chain,
