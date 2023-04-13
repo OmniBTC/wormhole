@@ -2,10 +2,20 @@
 name = "Coin"
 version = "0.0.1"
 
-[dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "2d709054a08d904b9229a2472af679f210af3827" }
-TokenBridge = { local = "../token_bridge"}
-Wormhole = { local = "../wormhole"}
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "a63f425b9999c7fdfe483598720a9effc0acdc9e"
+
+[dependencies.TokenBridge]
+local = "../token_bridge"
 
 [addresses]
-coin="0x0"
+coin = "_"
+
+[dev-dependencies.TokenBridge]
+local = "../token_bridge"
+
+[dev-addresses]
+token_bridge = "0x200"
+coin = "0x300"

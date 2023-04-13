@@ -28,7 +28,9 @@ export const CHAINS = {
   pythnet: 26,
   xpla: 28,
   btc: 29,
+  base: 30,
   wormchain: 3104,
+  sepolia: 10002,
 } as const;
 
 export type ChainName = keyof typeof CHAINS;
@@ -54,7 +56,9 @@ export type EVMChainName =
   | "neon"
   | "arbitrum"
   | "optimism"
-  | "gnosis";
+  | "gnosis"
+  | "base"
+  | "sepolia";
 
 /**
  *
@@ -227,7 +231,17 @@ const MAINNET = {
     token_bridge: undefined,
     nft_bridge: undefined,
   },
+  base: {
+    core: undefined,
+    token_bridge: undefined,
+    nft_bridge: undefined,
+  },
   wormchain: {
+    core: undefined,
+    token_bridge: undefined,
+    nft_bridge: undefined,
+  },
+  sepolia: { // This is testnet only.
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
@@ -383,10 +397,20 @@ const TESTNET = {
     token_bridge: undefined,
     nft_bridge: undefined,
   },
+  base: {
+    core: "0x23908A62110e21C04F3A4e011d24F901F911744A",
+    token_bridge: "0xA31aa3FDb7aF7Db93d18DDA4e19F811342EDF780",
+    nft_bridge: "0xF681d1cc5F25a3694E348e7975d7564Aa581db59",
+  },
   wormchain: {
     core: undefined,
     token_bridge: undefined,
     nft_bridge: undefined,
+  },
+  sepolia: {
+    core: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
+    token_bridge: "0xDB5492265f6038831E89f495670FF909aDe94bd9",
+    nft_bridge: "0x6a0B52ac198e4870e5F3797d5B403838a5bbFD99",
   },
 };
 
@@ -539,9 +563,19 @@ const DEVNET = {
     token_bridge: undefined,
     nft_bridge: undefined,
   },
+  base: {
+    core: undefined,
+    token_bridge: undefined,
+    nft_bridge: undefined,
+  },
   wormchain: {
     core: "wormhole1ap5vgur5zlgys8whugfegnn43emka567dtq0jl",
     token_bridge: "wormhole1zugu6cajc4z7ue29g9wnes9a5ep9cs7yu7rn3z",
+    nft_bridge: undefined,
+  },
+  sepolia: {
+    core: undefined,
+    token_bridge: undefined,
     nft_bridge: undefined,
   },
 };
@@ -613,7 +647,9 @@ export const CHAIN_ID_GNOSIS = CHAINS["gnosis"];
 export const CHAIN_ID_PYTHNET = CHAINS["pythnet"];
 export const CHAIN_ID_XPLA = CHAINS["xpla"];
 export const CHAIN_ID_BTC = CHAINS["btc"];
+export const CHAIN_ID_BASE = CHAINS["base"];
 export const CHAIN_ID_WORMCHAIN = CHAINS["wormchain"];
+export const CHAIN_ID_SEPOLIA = CHAINS["sepolia"];
 
 // This inverts the [[CHAINS]] object so that we can look up a chain by id
 export type ChainIdToName = {
@@ -743,7 +779,9 @@ export function isEVMChain(
     chainId === CHAIN_ID_NEON ||
     chainId === CHAIN_ID_ARBITRUM ||
     chainId === CHAIN_ID_OPTIMISM ||
-    chainId === CHAIN_ID_GNOSIS
+    chainId === CHAIN_ID_GNOSIS ||
+    chainId === CHAIN_ID_BASE ||
+    chainId === CHAIN_ID_SEPOLIA
   ) {
     return isEVM(chainId);
   } else {

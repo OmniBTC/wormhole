@@ -1,7 +1,14 @@
-import { CONTRACTS as SDK_CONTRACTS } from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
+import {
+  CHAIN_ID_SOLANA,
+  CONTRACTS as SDK_CONTRACTS,
+} from "@certusone/wormhole-sdk/lib/cjs/utils/consts";
 
 const OVERRIDES = {
   MAINNET: {
+    sui: {
+      core: undefined,
+      token_bridge: undefined,
+    },
     aptos: {
       token_bridge:
         "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
@@ -11,6 +18,10 @@ const OVERRIDES = {
     },
   },
   TESTNET: {
+    sui: {
+      core: undefined,
+      token_bridge: undefined,
+    },
     aptos: {
       token_bridge:
         "0x576410486a2da45eee6c949c995670112ddf2fbeedab20350d506328eefc9d4f",
@@ -20,6 +31,11 @@ const OVERRIDES = {
     },
   },
   DEVNET: {
+    sui: {
+      core: "0x7483d0db53a140eed72bd6cb133daa59c539844f4c053924b9e3f0d2d7ba146d",
+      token_bridge:
+        "0x4fa45cbe562fdbd8acf882addfedf6406c2770bf7f93cef1eebf8a3fb497c35e",
+    },
     aptos: {
       token_bridge:
         "0x84a5f374d29fc77e370014dce4fd6a55b58ad608de8074b0be5571701724da31",
@@ -30,6 +46,7 @@ const OVERRIDES = {
   },
 };
 
+// TODO(aki): move this to SDK at some point
 export const CONTRACTS = {
   MAINNET: { ...SDK_CONTRACTS.MAINNET, ...OVERRIDES.MAINNET },
   TESTNET: { ...SDK_CONTRACTS.TESTNET, ...OVERRIDES.TESTNET },
@@ -44,7 +61,7 @@ export const NAMED_ADDRESSES_OPTIONS = {
 
 export const NETWORK_OPTIONS = {
   alias: "n",
-  describe: "network",
+  describe: "Network",
   type: "string",
   choices: ["mainnet", "testnet", "devnet"],
   required: true,
@@ -56,3 +73,7 @@ export const RPC_OPTIONS = {
   type: "string",
   required: false,
 } as const;
+
+export const GOVERNANCE_CHAIN = CHAIN_ID_SOLANA;
+export const GOVERNANCE_EMITTER =
+  "0000000000000000000000000000000000000000000000000000000000000004";

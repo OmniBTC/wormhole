@@ -39,9 +39,9 @@ spec:
         - name: sui-node
           image: sui-node
           command:
-            - /bin/sh 
-            - -c 
-            - /tmp/start_node.sh
+            - /bin/sh
+            - -c
+            - /tmp/scripts/start_node.sh
           ports:
             - containerPort: 9000
               name: node
@@ -55,5 +55,17 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 9000
-
-      restartPolicy: Always
+        - name: sui-contracts
+          image: sui-node
+          command: ["/bin/bash", "-c"]
+          args:
+            [
+              "cd /tmp/scripts && ./wait_for_devnet.sh && ./deploy.sh devnet && ./register_devnet.sh && touch success && sleep infinity",
+            ]
+          readinessProbe:
+            periodSeconds: 1
+            failureThreshold: 300
+            exec:
+              command:
+                - cat
+                - /tmp/scripts/success

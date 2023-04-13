@@ -20,9 +20,7 @@ module wormhole::migrate {
 
     /// Execute migration logic. See `wormhole::migrate` description for more
     /// info.
-    public entry fun migrate(
-        wormhole_state: &mut State,
-    ) {
+    public entry fun migrate(wormhole_state: &mut State) {
         // Wormhole `State` only allows one to call `migrate` after the upgrade
         // procedure completed.
         assert!(state::can_migrate(wormhole_state), E_CANNOT_MIGRATE);

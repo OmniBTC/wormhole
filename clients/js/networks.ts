@@ -144,6 +144,10 @@ const MAINNET = {
     rpc: "https://rpc.gnosischain.com/",
     key: get_env_var("ETH_KEY"),
   },
+  base: {
+    rpc: undefined,
+    key: get_env_var("ETH_KEY"),
+  },
 };
 
 const TESTNET = {
@@ -193,11 +197,11 @@ const TESTNET = {
     key: get_env_var("ETH_KEY_TESTNET"),
   },
   karura: {
-    rpc: "https://karura-dev.aca-dev.network/eth/http",
+    rpc: "https://eth-rpc-karura-testnet.aca-staging.network",
     key: get_env_var("ETH_KEY_TESTNET"),
   },
   acala: {
-    rpc: "https://acala-dev.aca-dev.network/eth/http",
+    rpc: "https://eth-rpc-acala-testnet.aca-staging.network",
     key: get_env_var("ETH_KEY_TESTNET"),
   },
   klaytn: {
@@ -272,6 +276,10 @@ const TESTNET = {
   },
   gnosis: {
     rpc: "https://sokol.poa.network/",
+    key: get_env_var("ETH_KEY_TESTNET"),
+  },
+  base: {
+    rpc: "https://goerli.base.org",
     key: get_env_var("ETH_KEY_TESTNET"),
   },
 };
@@ -376,7 +384,7 @@ const DEVNET = {
   },
   sui: {
     rpc: "http://0.0.0.0:9000",
-    key: "AIGosn9itp74Z+M7LQpkwy5JCNjIBYh88rypgh5kfdU3",
+    key: "AGA20wtGcwbcNAG4nwapbQ5wIuXwkYQEWFUoSVAxctHb",
   },
   moonbeam: {
     rpc: undefined,
@@ -400,6 +408,10 @@ const DEVNET = {
     key: undefined,
   },
   gnosis: {
+    rpc: undefined,
+    key: undefined,
+  },
+  base: {
     rpc: undefined,
     key: undefined,
   },

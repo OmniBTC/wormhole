@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/certusone/wormhole/node/pkg/notify/discord"
-
 	"github.com/certusone/wormhole/node/pkg/db"
 	"github.com/certusone/wormhole/node/pkg/governor"
 
@@ -30,9 +28,9 @@ type (
 		GetEmitterChain() vaa.ChainID
 		// MessageID returns a human-readable emitter_chain/emitter_address/sequence tuple.
 		MessageID() string
-		// SigningMsg returns the hash of the signing body of the observation. This is used
+		// SigningDigest returns the hash of the hash signing body of the observation. This is used
 		// for signature generation and verification.
-		SigningMsg() ethcommon.Hash
+		SigningDigest() ethcommon.Hash
 		// IsReliable returns whether this message is considered reliable meaning it can be reobserved.
 		IsReliable() bool
 		// HandleQuorum finishes processing the observation once a quorum of signatures have
@@ -102,13 +100,6 @@ type Processor struct {
 	// gk is the node's guardian private key
 	gk *ecdsa.PrivateKey
 
-	// devnetMode specified whether to submit transactions to the hardcoded Ethereum devnet
-	devnetMode         bool
-	devnetNumGuardians uint
-	devnetEthRPC       string
-
-	wormchainLCD string
-
 	attestationEvents *reporter.AttestationEventReporter
 
 	logger *zap.Logger
@@ -130,7 +121,6 @@ type Processor struct {
 	// cleanup triggers periodic state cleanup
 	cleanup *time.Ticker
 
-	notifier    *discord.DiscordNotifier
 	governor    *governor.ChainGovernor
 	acct        *accountant.Accountant
 	acctReadC   <-chan *common.MessagePublication
@@ -149,37 +139,25 @@ func NewProcessor(
 	signedInC <-chan *gossipv1.SignedVAAWithQuorum,
 	gk *ecdsa.PrivateKey,
 	gst *common.GuardianSetState,
-	devnetMode bool,
-	devnetNumGuardians uint,
-	devnetEthRPC string,
-	wormchainLCD string,
 	attestationEvents *reporter.AttestationEventReporter,
-	notifier *discord.DiscordNotifier,
 	g *governor.ChainGovernor,
 	acct *accountant.Accountant,
 	acctReadC <-chan *common.MessagePublication,
 ) *Processor {
 
 	return &Processor{
-		msgC:               msgC,
-		setC:               setC,
-		gossipSendC:        gossipSendC,
-		obsvC:              obsvC,
-		obsvReqSendC:       obsvReqSendC,
-		signedInC:          signedInC,
-		injectC:            injectC,
-		gk:                 gk,
-		gst:                gst,
-		devnetMode:         devnetMode,
-		devnetNumGuardians: devnetNumGuardians,
-		devnetEthRPC:       devnetEthRPC,
-		db:                 db,
-
-		wormchainLCD: wormchainLCD,
+		msgC:         msgC,
+		setC:         setC,
+		gossipSendC:  gossipSendC,
+		obsvC:        obsvC,
+		obsvReqSendC: obsvReqSendC,
+		signedInC:    signedInC,
+		injectC:      injectC,
+		gk:           gk,
+		gst:          gst,
+		db:           db,
 
 		attestationEvents: attestationEvents,
-
-		notifier: notifier,
 
 		logger:      supervisor.Logger(ctx),
 		state:       &aggregationState{observationMap{}},
@@ -218,7 +196,7 @@ func (p *Processor) Run(ctx context.Context) error {
 			if p.acct != nil {
 				shouldPub, err := p.acct.SubmitObservation(k)
 				if err != nil {
-					return fmt.Errorf("acct: failed to process message `%s`: %w", k.MessageIDString(), err)
+					return fmt.Errorf("failed to process message `%s`: %w", k.MessageIDString(), err)
 				}
 				if !shouldPub {
 					continue
@@ -228,7 +206,11 @@ func (p *Processor) Run(ctx context.Context) error {
 
 		case k := <-p.acctReadC:
 			if p.acct == nil {
-				return fmt.Errorf("acct: received an accountant event when accountant is not configured")
+				return fmt.Errorf("received an accountant event when accountant is not configured")
+			}
+			// SECURITY defense-in-depth: Make sure the accountant did not generate an unexpected message.
+			if !p.acct.IsMessageCoveredByAccountant(k) {
+				return fmt.Errorf("accountant published a message that is not covered by it: `%s`", k.MessageIDString())
 			}
 			p.handleMessage(ctx, k)
 		case v := <-p.injectC:
@@ -256,7 +238,7 @@ func (p *Processor) Run(ctx context.Context) error {
 						if p.acct != nil {
 							shouldPub, err := p.acct.SubmitObservation(k)
 							if err != nil {
-								return fmt.Errorf("acct: failed to process message released by governor `%s`: %w", k.MessageIDString(), err)
+								return fmt.Errorf("failed to process message released by governor `%s`: %w", k.MessageIDString(), err)
 							}
 							if !shouldPub {
 								continue

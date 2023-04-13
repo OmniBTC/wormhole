@@ -23,8 +23,8 @@ Make sure your Cargo version is at least 1.65.0 and then follow the steps below:
 
 Install the `Sui` CLI. This tool is used to compile the contracts and run the tests.
 
-``` sh
-$ cargo install --locked --git https://github.com/MystenLabs/sui.git --rev 82c9c80c11488858f1d3930f47ec9f335a566683 sui sui-faucet
+```sh
+cargo install --locked --git https://github.com/MystenLabs/sui.git --rev a63f425b9999c7fdfe483598720a9effc0acdc9e sui sui-faucet
 ```
 
 Some useful Sui CLI commands are
@@ -46,7 +46,7 @@ As an optional, but recommended step, install the
 [move-analyzer](https://github.com/move-language/move/tree/main/language/move-analyzer)
 Language Server (LSP):
 
-``` sh
+```sh
 cargo install --git https://github.com/move-language/move.git move-analyzer --branch main --features "address32"
 ```
 
@@ -105,7 +105,7 @@ Once the validator is running, the contracts are ready to deploy. In the
 [scripts](./scripts) directory, run
 
 ```sh
-scripts $ ./deploy devnet
+scripts $ ./deploy.sh devnet
 ```
 
 This will deploy the core contract and the token bridge.

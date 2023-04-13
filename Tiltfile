@@ -151,7 +151,6 @@ def build_node_yaml():
             container = obj["spec"]["template"]["spec"]["containers"][0]
             if container["name"] != "guardiand":
                 fail("container 0 is not guardiand")
-            container["command"] += ["--devNumGuardians", str(num_guardians)]
 
             if guardiand_debug:
                 container["command"] = command_with_dlv(container["command"])
@@ -717,10 +716,10 @@ if sui:
     docker_build(
         ref = "sui-node",
         target = "sui",
-        context = "sui",
+        context = ".",
         dockerfile = "sui/Dockerfile",
         ignore = ["./sui/sui.log*", "sui/sui.log*", "sui.log.*"],
-        only = [],
+        only = ["./sui", "./clients/js"],
     )
 
     k8s_resource(
