@@ -9,7 +9,7 @@ subdir = "crates/sui-framework/packages/sui-framework"
 rev = "a63f425b9999c7fdfe483598720a9effc0acdc9e"
 
 [addresses]
-wormhole = "_"
+wormhole = "0x0"
 
 [dev-addresses]
 wormhole = "0x100"
