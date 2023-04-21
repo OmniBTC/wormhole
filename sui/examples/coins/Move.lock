@@ -5,9 +5,7 @@ version = 0
 
 dependencies = [
   { name = "Sui" },
-]
-
-dev-dependencies = [
+  { name = "TokenBridge" },
   { name = "Wormhole" },
 ]
 
@@ -21,6 +19,15 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "3a70c4374090b02
 
 dependencies = [
   { name = "MoveStdlib" },
+]
+
+[[move.package]]
+name = "TokenBridge"
+source = { local = "../../token_bridge" }
+
+dependencies = [
+  { name = "Sui" },
+  { name = "Wormhole" },
 ]
 
 [[move.package]]

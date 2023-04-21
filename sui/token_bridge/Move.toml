@@ -12,6 +12,7 @@ sui = "0x2"
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
 rev = "cab7e9762d4d75126a78fdd009b405745657fe57"
+rev = "3a70c4374090b020b95465787f3220a95d8ab0ba"
 
 [dependencies.Wormhole]
 local = "../wormhole"

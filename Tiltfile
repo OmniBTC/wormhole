@@ -73,7 +73,7 @@ ci = cfg.get("ci", False)
 algorand = cfg.get("algorand", ci)
 near = cfg.get("near", ci)
 aptos = cfg.get("aptos", ci)
-sui = cfg.get("sui", False)
+sui = cfg.get("sui", ci)
 evm2 = cfg.get("evm2", ci)
 solana = cfg.get("solana", ci)
 pythnet = cfg.get("pythnet", False)
@@ -188,12 +188,8 @@ def build_node_yaml():
                 container["command"] += [
                     "--suiRPC",
                     "http://sui:9000",
-# In testnet and mainnet, you will need to also specify the suiPackage argument.  In Devnet, we subscribe to
-# event traffic purely based on the account since that is the only thing that is deterministic.
-#                    "--suiPackage",
-#                    "0x.....",
-                    "--suiAccount",
-                    "0x2acab6bb0e4722e528291bc6ca4f097e18ce9331",
+                    "--suiMoveEventType",
+                    "0xa26bb6f2c14d8921191aeb3e7b718a247e1b71c02e7598a0bfad5ad213d6f105::publish_message::WormholeMessage",
                     "--suiWS",
                     "sui:9000",
                 ]
@@ -729,7 +725,7 @@ if sui:
             port_forward(5003, name = "Faucet [:5003]", host = webHost),
             port_forward(9184, name = "Prometheus [:9184]", host = webHost),
         ],
-#        resource_deps = ["const-gen"],
+        resource_deps = ["const-gen"],
         labels = ["sui"],
         trigger_mode = trigger_mode,
     )
