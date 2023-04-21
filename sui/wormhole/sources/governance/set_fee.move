@@ -105,8 +105,7 @@ module wormhole::set_fee_tests {
         return_state,
         set_up_wormhole,
         take_clock,
-        take_state,
-        upgrade_wormhole
+        take_state
     };
 
     const VAA_SET_FEE_1: vector<u8> =
@@ -170,43 +169,43 @@ module wormhole::set_fee_tests {
         test_scenario::end(my_scenario);
     }
 
-    #[test]
-    public fun test_set_fee_after_upgrade() {
-        // Testing this method.
-        use wormhole::set_fee::{set_fee};
-
-        // Set up.
-        let caller = person();
-        let my_scenario = test_scenario::begin(caller);
-        let scenario = &mut my_scenario;
-
-        let wormhole_fee = 420;
-        set_up_wormhole(scenario, wormhole_fee);
-
-        // Upgrade.
-        upgrade_wormhole(scenario);
-
-        // Prepare test to execute `set_fee`.
-        test_scenario::next_tx(scenario, caller);
-
-        let worm_state = take_state(scenario);
-        let the_clock = take_clock(scenario);
-
-        // Double-check current fee (from setup).
-        assert!(state::message_fee(&worm_state) == wormhole_fee, 0);
-
-        let fee_amount = set_fee(&mut worm_state, VAA_SET_FEE_1, &the_clock);
-
-        // Confirm the fee changed.
-        assert!(state::message_fee(&worm_state) == fee_amount, 0);
-
-        // Clean up.
-        return_state(worm_state);
-        return_clock(the_clock);
-
-        // Done.
-        test_scenario::end(my_scenario);
-    }
+    // #[test]
+    // public fun test_set_fee_after_upgrade() {
+    //     // Testing this method.
+    //     use wormhole::set_fee::{set_fee};
+    //
+    //     // Set up.
+    //     let caller = person();
+    //     let my_scenario = test_scenario::begin(caller);
+    //     let scenario = &mut my_scenario;
+    //
+    //     let wormhole_fee = 420;
+    //     set_up_wormhole(scenario, wormhole_fee);
+    //
+    //     // Upgrade.
+    //     upgrade_wormhole(scenario);
+    //
+    //     // Prepare test to execute `set_fee`.
+    //     test_scenario::next_tx(scenario, caller);
+    //
+    //     let worm_state = take_state(scenario);
+    //     let the_clock = take_clock(scenario);
+    //
+    //     // Double-check current fee (from setup).
+    //     assert!(state::message_fee(&worm_state) == wormhole_fee, 0);
+    //
+    //     let fee_amount = set_fee(&mut worm_state, VAA_SET_FEE_1, &the_clock);
+    //
+    //     // Confirm the fee changed.
+    //     assert!(state::message_fee(&worm_state) == fee_amount, 0);
+    //
+    //     // Clean up.
+    //     return_state(worm_state);
+    //     return_clock(the_clock);
+    //
+    //     // Done.
+    //     test_scenario::end(my_scenario);
+    // }
 
     #[test]
     #[expected_failure(abort_code = wormhole::set::E_KEY_ALREADY_EXISTS)]

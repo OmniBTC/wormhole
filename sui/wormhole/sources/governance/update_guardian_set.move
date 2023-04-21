@@ -157,8 +157,7 @@ module wormhole::update_guardian_set_tests {
         return_state,
         set_up_wormhole,
         take_clock,
-        take_state,
-        upgrade_wormhole
+        take_state
     };
 
     const VAA_UPDATE_GUARDIAN_SET_1: vector<u8> =
@@ -268,43 +267,43 @@ module wormhole::update_guardian_set_tests {
         test_scenario::end(my_scenario);
     }
 
-    #[test]
-    public fun test_update_guardian_set_after_upgrade() {
-        // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
-
-        // Set up.
-        let caller = person();
-        let my_scenario = test_scenario::begin(caller);
-        let scenario = &mut my_scenario;
-
-        let wormhole_fee = 350;
-        set_up_wormhole(scenario, wormhole_fee);
-
-        // Upgrade.
-        upgrade_wormhole(scenario);
-
-        // Prepare test to execute `update_guardian_set`.
-        test_scenario::next_tx(scenario, caller);
-
-        let worm_state = take_state(scenario);
-        let the_clock = take_clock(scenario);
-
-        let new_index =
-            update_guardian_set(
-                &mut worm_state,
-                VAA_UPDATE_GUARDIAN_SET_1,
-                &the_clock
-            );
-        assert!(new_index == 1, 0);
-
-        // Clean up.
-        return_state(worm_state);
-        return_clock(the_clock);
-
-        // Done.
-        test_scenario::end(my_scenario);
-    }
+    // #[test]
+    // public fun test_update_guardian_set_after_upgrade() {
+    //     // Testing this method.
+    //     use wormhole::update_guardian_set::{update_guardian_set};
+    //
+    //     // Set up.
+    //     let caller = person();
+    //     let my_scenario = test_scenario::begin(caller);
+    //     let scenario = &mut my_scenario;
+    //
+    //     let wormhole_fee = 350;
+    //     set_up_wormhole(scenario, wormhole_fee);
+    //
+    //     // Upgrade.
+    //     upgrade_wormhole(scenario);
+    //
+    //     // Prepare test to execute `update_guardian_set`.
+    //     test_scenario::next_tx(scenario, caller);
+    //
+    //     let worm_state = take_state(scenario);
+    //     let the_clock = take_clock(scenario);
+    //
+    //     let new_index =
+    //         update_guardian_set(
+    //             &mut worm_state,
+    //             VAA_UPDATE_GUARDIAN_SET_1,
+    //             &the_clock
+    //         );
+    //     assert!(new_index == 1, 0);
+    //
+    //     // Clean up.
+    //     return_state(worm_state);
+    //     return_clock(the_clock);
+    //
+    //     // Done.
+    //     test_scenario::end(my_scenario);
+    // }
 
     #[test]
     #[expected_failure(

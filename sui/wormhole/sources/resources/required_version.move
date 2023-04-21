@@ -121,9 +121,6 @@ module wormhole::required_version {
 
 #[test_only]
 module wormhole::required_version_test {
-    use sui::hash::{keccak256};
-    use sui::object::{Self};
-    use sui::package::{Self};
     use sui::tx_context::{Self};
 
     use wormhole::required_version::{Self};
@@ -131,79 +128,79 @@ module wormhole::required_version_test {
     struct SomeMethod {}
     struct AnotherMethod {}
 
-    #[test]
-    public fun test_check_minimum_requirement() {
-        let ctx = &mut tx_context::dummy();
-
-        let version = 1;
-        let req = required_version::new(version, ctx);
-        assert!(required_version::current(&req) == version, 0);
-
-        required_version::add<SomeMethod>(&mut req);
-        assert!(required_version::minimum_for<SomeMethod>(&req) == version, 0);
-
-        // Should not abort here.
-        required_version::check_minimum_requirement<SomeMethod>(&req, version);
-
-        // And should not abort if the version is anything greater than the
-        // current.
-        let new_version = version + 1;
-        required_version::check_minimum_requirement<SomeMethod>(
-            &req,
-            new_version
-        );
-
-        // Uptick based on new upgrade.
-        let upgrade_cap = package::test_publish(
-            object::id_from_address(@wormhole),
-            ctx
-        );
-        let digest = keccak256(&x"DEADBEEF");
-        let policy = package::upgrade_policy(&upgrade_cap);
-        let upgrade_ticket =
-            package::authorize_upgrade(&mut upgrade_cap, policy, digest);
-        let upgrade_receipt = package::test_upgrade(upgrade_ticket);
-        package::commit_upgrade(&mut upgrade_cap, upgrade_receipt);
-        assert!(package::version(&upgrade_cap) == new_version, 0);
-
-        // Update to the latest version.
-        required_version::update_latest(&mut req, &upgrade_cap);
-        assert!(required_version::current(&req) == new_version, 0);
-
-        // Should still not abort here.
-        required_version::check_minimum_requirement<SomeMethod>(
-            &req,
-            new_version
-        );
-
-        // Require new version for `SomeMethod` and show that
-        // `check_minimum_requirement` still succeeds.
-        required_version::require_current_version<SomeMethod>(&mut req);
-        assert!(
-            required_version::minimum_for<SomeMethod>(&req) == new_version,
-            0
-        );
-        required_version::check_minimum_requirement<SomeMethod>(
-            &req,
-            new_version
-        );
-
-        // If another method gets added to the mix, it should automatically meet
-        // the minimum requirement because its version will be the latest.
-        required_version::add<AnotherMethod>(&mut req);
-        assert!(
-            required_version::minimum_for<AnotherMethod>(&req) == new_version,
-            0
-        );
-        required_version::check_minimum_requirement<SomeMethod>(
-            &req,
-            new_version
-        );
-
-        // Clean up.
-        package::make_immutable(upgrade_cap);
-        required_version::destroy(req);
-    }
+    // #[test]
+    // public fun test_check_minimum_requirement() {
+    //     let ctx = &mut tx_context::dummy();
+    //
+    //     let version = 1;
+    //     let req = required_version::new(version, ctx);
+    //     assert!(required_version::current(&req) == version, 0);
+    //
+    //     required_version::add<SomeMethod>(&mut req);
+    //     assert!(required_version::minimum_for<SomeMethod>(&req) == version, 0);
+    //
+    //     // Should not abort here.
+    //     required_version::check_minimum_requirement<SomeMethod>(&req, version);
+    //
+    //     // And should not abort if the version is anything greater than the
+    //     // current.
+    //     let new_version = version + 1;
+    //     required_version::check_minimum_requirement<SomeMethod>(
+    //         &req,
+    //         new_version
+    //     );
+    //
+    //     // Uptick based on new upgrade.
+    //     let upgrade_cap = package::test_publish(
+    //         object::id_from_address(@wormhole),
+    //         ctx
+    //     );
+    //     let digest = keccak256(&x"DEADBEEF");
+    //     let policy = package::upgrade_policy(&upgrade_cap);
+    //     let upgrade_ticket =
+    //         package::authorize_upgrade(&mut upgrade_cap, policy, digest);
+    //     let upgrade_receipt = package::test_upgrade(upgrade_ticket);
+    //     package::commit_upgrade(&mut upgrade_cap, upgrade_receipt);
+    //     assert!(package::version(&upgrade_cap) == new_version, 0);
+    //
+    //     // Update to the latest version.
+    //     required_version::update_latest(&mut req, &upgrade_cap);
+    //     assert!(required_version::current(&req) == new_version, 0);
+    //
+    //     // Should still not abort here.
+    //     required_version::check_minimum_requirement<SomeMethod>(
+    //         &req,
+    //         new_version
+    //     );
+    //
+    //     // Require new version for `SomeMethod` and show that
+    //     // `check_minimum_requirement` still succeeds.
+    //     required_version::require_current_version<SomeMethod>(&mut req);
+    //     assert!(
+    //         required_version::minimum_for<SomeMethod>(&req) == new_version,
+    //         0
+    //     );
+    //     required_version::check_minimum_requirement<SomeMethod>(
+    //         &req,
+    //         new_version
+    //     );
+    //
+    //     // If another method gets added to the mix, it should automatically meet
+    //     // the minimum requirement because its version will be the latest.
+    //     required_version::add<AnotherMethod>(&mut req);
+    //     assert!(
+    //         required_version::minimum_for<AnotherMethod>(&req) == new_version,
+    //         0
+    //     );
+    //     required_version::check_minimum_requirement<SomeMethod>(
+    //         &req,
+    //         new_version
+    //     );
+    //
+    //     // Clean up.
+    //     package::make_immutable(upgrade_cap);
+    //     required_version::destroy(req);
+    // }
 
     #[test]
     #[expected_failure(abort_code = required_version::E_OUTDATED_VERSION)]

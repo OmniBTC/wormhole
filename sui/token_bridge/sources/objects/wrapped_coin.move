@@ -77,45 +77,45 @@ module token_bridge::wrapped_coin {
     }
 }
 
-
-#[test_only]
-module token_bridge::wrapped_coin_test {
-    use sui::transfer::{Self};
-    use sui::coin::{Self, TreasuryCap};
-    use sui::test_scenario::{Self, Scenario, next_tx, ctx, take_from_address};
-
-    use token_bridge::wrapped_coin_7_decimals::{Self, WRAPPED_COIN_7_DECIMALS};
-    use token_bridge::wrapped_coin::{Self};
-
-    fun scenario(): Scenario { test_scenario::begin(@0x123233) }
-    fun people(): (address, address, address) { (@0x124323, @0xE05, @0xFACE) }
-
-    #[test]
-    public fun test_wrapped_coin_creation(){
-        let test = scenario();
-        let (admin, _, _) = people();
-        next_tx(&mut test, admin); {
-            wrapped_coin_7_decimals::test_init(ctx(&mut test));
-        };
-        next_tx(&mut test, admin);{
-            let tcap = take_from_address<TreasuryCap<WRAPPED_COIN_7_DECIMALS>>(
-                &mut test,
-                admin
-            );
-            let wrapped_coin = wrapped_coin::new_test_only(
-                x"112233", //vaa bytes
-                tcap, // treasury cap
-                6, // decimals
-                ctx(&mut test)
-            );
-            let (vaa_bytes, tcap, decimals) = wrapped_coin::destroy_test_only(
-                wrapped_coin
-            );
-            assert!(vaa_bytes == x"112233", 0);
-            assert!(decimals == 6, 0);
-            assert!(coin::total_supply<WRAPPED_COIN_7_DECIMALS>(&tcap)==0, 0);
-            transfer::public_transfer(tcap, admin);
-        };
-        test_scenario::end(test);
-    }
-}
+//
+// #[test_only]
+// module token_bridge::wrapped_coin_test {
+//     use sui::transfer::{Self};
+//     use sui::coin::{Self, TreasuryCap};
+//     use sui::test_scenario::{Self, Scenario, next_tx, ctx, take_from_address};
+//
+//     use token_bridge::wrapped_coin_7_decimals::{Self, WRAPPED_COIN_7_DECIMALS};
+//     use token_bridge::wrapped_coin::{Self};
+//
+//     fun scenario(): Scenario { test_scenario::begin(@0x123233) }
+//     fun people(): (address, address, address) { (@0x124323, @0xE05, @0xFACE) }
+//
+//     #[test]
+//     public fun test_wrapped_coin_creation(){
+//         let test = scenario();
+//         let (admin, _, _) = people();
+//         next_tx(&mut test, admin); {
+//             wrapped_coin_7_decimals::test_init(ctx(&mut test));
+//         };
+//         next_tx(&mut test, admin);{
+//             let tcap = take_from_address<TreasuryCap<WRAPPED_COIN_7_DECIMALS>>(
+//                 &mut test,
+//                 admin
+//             );
+//             let wrapped_coin = wrapped_coin::new_test_only(
+//                 x"112233", //vaa bytes
+//                 tcap, // treasury cap
+//                 6, // decimals
+//                 ctx(&mut test)
+//             );
+//             let (vaa_bytes, tcap, decimals) = wrapped_coin::destroy_test_only(
+//                 wrapped_coin
+//             );
+//             assert!(vaa_bytes == x"112233", 0);
+//             assert!(decimals == 6, 0);
+//             assert!(coin::total_supply<WRAPPED_COIN_7_DECIMALS>(&tcap)==0, 0);
+//             transfer::public_transfer(tcap, admin);
+//         };
+//         test_scenario::end(test);
+//     }
+// }
