@@ -8,9 +8,8 @@
 /// 3.  Upgrade.
 /// 4.  Commit upgrade.
 module wormhole::upgrade_contract {
-    use sui::clock::{Clock};
     use sui::event::{Self};
-    use sui::object::{Self, ID};
+    use sui::object::{ID};
     use sui::package::{UpgradeReceipt, UpgradeTicket};
 
     use wormhole::bytes32::{Self, Bytes32};
@@ -39,21 +38,10 @@ module wormhole::upgrade_contract {
     /// a contract upgrade VAA. This governance message is only relevant for Sui
     /// because a contract upgrade is only relevant to one particular network
     /// (in this case Sui), whose build digest is encoded in this message.
-    ///
-    /// NOTE: This method is guarded by a minimum build version check. This
-    /// method could break backward compatibility on an upgrade.
-    public fun upgrade_contract(
+    public fun authorize_upgrade(
         wormhole_state: &mut State,
-        vaa_buf: vector<u8>,
-        the_clock: &Clock
+        msg: GovernanceMessage
     ): UpgradeTicket {
-        let msg =
-            governance_message::parse_and_verify_vaa(
-                wormhole_state,
-                vaa_buf,
-                the_clock
-            );
-
         // Do not allow this VAA to be replayed.
         consumed_vaas::consume(
             state::borrow_mut_consumed_vaas(wormhole_state),
@@ -71,15 +59,10 @@ module wormhole::upgrade_contract {
         self: &mut State,
         receipt: UpgradeReceipt,
     ) {
-        let latest_package_id = state::commit_upgrade(self, receipt);
+        let (old_contract, new_contract) = state::commit_upgrade(self, receipt);
 
         // Emit an event reflecting package ID change.
-        event::emit(
-            ContractUpgraded {
-                old_contract: object::id_from_address(@wormhole),
-                new_contract: latest_package_id
-            }
-        );
+        event::emit(ContractUpgraded { old_contract, new_contract });
     }
 
     fun handle_upgrade_contract(

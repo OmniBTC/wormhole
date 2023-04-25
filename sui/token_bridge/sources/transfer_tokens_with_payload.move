@@ -15,8 +15,9 @@ module token_bridge::transfer_tokens_with_payload {
     use sui::clock::{Clock};
     use sui::coin::{Coin};
     use sui::sui::{SUI};
+    use wormhole::bytes32::{Self};
     use wormhole::emitter::{EmitterCap};
-    use wormhole::external_address::{ExternalAddress};
+    use wormhole::external_address::{Self, ExternalAddress};
     use wormhole::state::{State as WormholeState};
 
     use token_bridge::state::{Self, State};
@@ -25,9 +26,9 @@ module token_bridge::transfer_tokens_with_payload {
         TransferTokensWithPayload as TransferTokensWithPayloadControl
     };
 
-    /// `transfer_tokens_with_payload` takes a `Balance` of a coin type and
-    /// bridges this asset out of Sui by either joining this balance in the
-    /// Token Bridge's custody for native assets or burning the balance
+    /// `transfer_tokens_with_payload` takes a `Coin` object of a coin type and
+    /// bridges this asset out of Sui by either joining its balance in the
+    /// Token Bridge's custody for native assets or burning its balance
     /// for wrapped assets.
     ///
     /// The `EmitterCap` is encoded as the sender of these assets. And
@@ -43,7 +44,7 @@ module token_bridge::transfer_tokens_with_payload {
         bridged_in: Coin<CoinType>,
         wormhole_fee: Coin<SUI>,
         redeemer_chain: u16,
-        redeemer: ExternalAddress,
+        redeemer: vector<u8>,
         payload: vector<u8>,
         nonce: u32,
         the_clock: &Clock
@@ -59,7 +60,7 @@ module token_bridge::transfer_tokens_with_payload {
                 emitter_cap,
                 &mut bridged_in,
                 redeemer_chain,
-                redeemer,
+                external_address::new(bytes32::from_bytes(redeemer)),
                 payload
             );
 
@@ -113,7 +114,7 @@ module token_bridge::transfer_tokens_with_payload {
         emitter_cap: &EmitterCap,
         bridged_in: Coin<CoinType>,
         redeemer_chain: u16,
-        redeemer: ExternalAddress,
+        redeemer: vector<u8>,
         payload: vector<u8>
     ): (vector<u8>, Coin<CoinType>) {
         let payload =
@@ -122,7 +123,7 @@ module token_bridge::transfer_tokens_with_payload {
                 emitter_cap,
                 &mut bridged_in,
                 redeemer_chain,
-                redeemer,
+                external_address::new(bytes32::from_bytes(redeemer)),
                 payload
             );
 
@@ -139,6 +140,7 @@ module token_bridge::transfer_tokens_with_payload_tests {
     use wormhole::external_address::{Self};
     use wormhole::state::{chain_id};
     use wormhole::emitter::{Self};
+    use wormhole::bytes32::{Self};
 
     use token_bridge::coin_wrapped_7::{Self, COIN_WRAPPED_7};
     use token_bridge::coin_native_10::{Self, COIN_NATIVE_10};
@@ -163,7 +165,7 @@ module token_bridge::transfer_tokens_with_payload_tests {
     use token_bridge::normalized_amount::{Self};
 
     /// Test consts.
-    const TEST_TARGET_RECIPIENT: address = @0xbeef4269;
+    const TEST_TARGET_RECIPIENT: vector<u8> = x"beef4269";
     const TEST_TARGET_CHAIN: u16 = 2;
     const TEST_NONCE: u32 = 0;
     const TEST_COIN_NATIVE_10_DECIMALS: u8 = 10;
@@ -221,7 +223,7 @@ module token_bridge::transfer_tokens_with_payload_tests {
                 coin::from_balance(coin_10_balance, ctx),
                 coin::mint_for_testing(wormhole_fee, ctx),
                 TEST_TARGET_CHAIN,
-                external_address::from_address(TEST_TARGET_RECIPIENT),
+                TEST_TARGET_RECIPIENT,
                 TEST_MESSAGE_PAYLOAD,
                 TEST_NONCE,
                 &the_clock,
@@ -294,16 +296,16 @@ module token_bridge::transfer_tokens_with_payload_tests {
         // Call `transfer_tokens`.
         let (_, dust) =
             transfer_tokens_with_payload<COIN_NATIVE_10>(
-            &mut token_bridge_state,
-            &emitter_cap,
-            &mut worm_state,
-            coin::from_balance(coin_10_balance, ctx),
-            coin::mint_for_testing(wormhole_fee, ctx),
-            TEST_TARGET_CHAIN,
-            external_address::from_address(TEST_TARGET_RECIPIENT),
-            TEST_MESSAGE_PAYLOAD,
-            TEST_NONCE,
-            &the_clock
+                &mut token_bridge_state,
+                &emitter_cap,
+                &mut worm_state,
+                coin::from_balance(coin_10_balance, ctx),
+                coin::mint_for_testing(wormhole_fee, ctx),
+                TEST_TARGET_CHAIN,
+                TEST_TARGET_RECIPIENT,
+                TEST_MESSAGE_PAYLOAD,
+                TEST_NONCE,
+                &the_clock
         );
         assert!(coin::value(&dust) == expected_dust, 0);
 
@@ -362,14 +364,15 @@ module token_bridge::transfer_tokens_with_payload_tests {
         let emitter_cap = emitter::dummy();
 
         // Serialize the payload.
-        let (payload, dust) = bridge_in_and_serialize_transfer_test_only(
-            &mut token_bridge_state,
-            &emitter_cap,
-            coin::from_balance(coin_10_balance, ctx),
-            TEST_TARGET_CHAIN,
-            external_address::from_address(TEST_TARGET_RECIPIENT),
-            TEST_MESSAGE_PAYLOAD
-        );
+        let (payload, dust) =
+            bridge_in_and_serialize_transfer_test_only(
+                &mut token_bridge_state,
+                &emitter_cap,
+                coin::from_balance(coin_10_balance, ctx),
+                TEST_TARGET_CHAIN,
+                TEST_TARGET_RECIPIENT,
+                TEST_MESSAGE_PAYLOAD
+            );
         assert!(coin::value(&dust) == 0, 0);
 
         // Construct expected payload from scratch and confirm that the
@@ -385,12 +388,12 @@ module token_bridge::transfer_tokens_with_payload_tests {
         );
 
         let expected_payload =
-            transfer_with_payload::new_from_emitter(
+            transfer_with_payload::new_from_emitter_test_only(
                 &emitter_cap,
                 expected_amount,
                 expected_token_address,
                 chain_id(),
-                external_address::from_address(TEST_TARGET_RECIPIENT),
+                external_address::new(bytes32::from_bytes(TEST_TARGET_RECIPIENT)),
                 TEST_TARGET_CHAIN,
                 TEST_MESSAGE_PAYLOAD
             );
@@ -458,7 +461,7 @@ module token_bridge::transfer_tokens_with_payload_tests {
                 coin::from_balance(coin_7_balance, ctx),
                 coin::mint_for_testing(wormhole_fee, ctx),
                 TEST_TARGET_CHAIN,
-                external_address::from_address(TEST_TARGET_RECIPIENT),
+                TEST_TARGET_RECIPIENT,
                 TEST_MESSAGE_PAYLOAD,
                 TEST_NONCE,
                 &the_clock,
@@ -517,14 +520,15 @@ module token_bridge::transfer_tokens_with_payload_tests {
         let emitter_cap = emitter::dummy();
 
         // Serialize the payload.
-        let (payload, dust) = bridge_in_and_serialize_transfer_test_only(
-            &mut token_bridge_state,
-            &emitter_cap,
-            coin::from_balance(coin_7_balance, ctx),
-            TEST_TARGET_CHAIN,
-            external_address::from_address(TEST_TARGET_RECIPIENT),
-            TEST_MESSAGE_PAYLOAD
-        );
+        let (payload, dust) =
+            bridge_in_and_serialize_transfer_test_only(
+                &mut token_bridge_state,
+                &emitter_cap,
+                coin::from_balance(coin_7_balance, ctx),
+                TEST_TARGET_CHAIN,
+                TEST_TARGET_RECIPIENT,
+                TEST_MESSAGE_PAYLOAD
+            );
         assert!(coin::value(&dust) == 0, 0);
 
         // Construct expected payload from scratch and confirm that the
@@ -545,12 +549,12 @@ module token_bridge::transfer_tokens_with_payload_tests {
         );
 
         let expected_payload =
-            transfer_with_payload::new_from_emitter(
+            transfer_with_payload::new_from_emitter_test_only(
                 &emitter_cap,
                 expected_amount,
                 expected_token_address,
                 expected_token_chain,
-                external_address::from_address(TEST_TARGET_RECIPIENT),
+                 external_address::new(bytes32::from_bytes(TEST_TARGET_RECIPIENT)),
                 TEST_TARGET_CHAIN,
                 TEST_MESSAGE_PAYLOAD
             );

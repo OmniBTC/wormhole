@@ -49,7 +49,7 @@ module token_bridge::setup {
 
     /// Only the owner of the `DeployerCap` can call this method. This
     /// method destroys the capability and shares the `State` object.
-    public entry fun complete(
+    public fun complete(
         worm_state: &WormholeState,
         deployer: DeployerCap,
         upgrade_cap: UpgradeCap,
@@ -58,7 +58,7 @@ module token_bridge::setup {
         let version = token_bridge::version_control::version();
         assert!(version == 1, E_INVALID_BUILD_VERSION);
 
-        wormhole::setup::assert_package_upgrade_cap<DeployerCap>(
+        wormhole::package_utils::assert_package_upgrade_cap<DeployerCap>(
             &upgrade_cap,
             package::compatible_policy(),
             version

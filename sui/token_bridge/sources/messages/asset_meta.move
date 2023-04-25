@@ -30,6 +30,7 @@ module token_bridge::asset_meta {
         /// Number of decimals of the token.
         native_decimals: u8,
         /// Symbol of the token (UTF-8).
+        /// TODO(csongor): maybe turn these into String32s?
         symbol: String,
         /// Name of the token (UTF-8).
         name: String,
@@ -173,6 +174,7 @@ module token_bridge::asset_meta {
 module token_bridge::asset_meta_tests {
     use std::string::{Self};
     use wormhole::external_address::{Self};
+    use wormhole::vaa::{Self};
 
     use token_bridge::asset_meta::{Self};
 
@@ -201,5 +203,17 @@ module token_bridge::asset_meta_tests {
 
         // Clean up.
         asset_meta::destroy(de);
+    }
+
+    #[test]
+    fun test_create_wrapped_12() {
+        use token_bridge::dummy_message::{encoded_asset_meta_vaa_foreign_12};
+
+        let payload =
+            vaa::peel_payload_from_vaa(&encoded_asset_meta_vaa_foreign_12());
+
+        let token_meta = asset_meta::deserialize(payload);
+        let serialized = asset_meta::serialize(token_meta);
+        assert!(payload == serialized, 0);
     }
 }

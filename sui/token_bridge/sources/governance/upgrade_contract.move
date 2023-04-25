@@ -8,14 +8,13 @@
 /// 3.  Upgrade.
 /// 4.  Commit upgrade.
 module token_bridge::upgrade_contract {
-    use sui::clock::{Clock};
     use sui::event::{Self};
-    use sui::object::{Self, ID};
+    use sui::object::{ID};
     use sui::package::{UpgradeReceipt, UpgradeTicket};
     use wormhole::bytes32::{Self, Bytes32};
+    use wormhole::consumed_vaas::{Self};
     use wormhole::cursor::{Self};
     use wormhole::governance_message::{Self, GovernanceMessage};
-    use wormhole::state::{State as WormholeState};
 
     use token_bridge::state::{Self, State};
 
@@ -40,23 +39,15 @@ module token_bridge::upgrade_contract {
     /// a contract upgrade VAA. This governance message is only relevant for Sui
     /// because a contract upgrade is only relevant to one particular network
     /// (in this case Sui), whose build digest is encoded in this message.
-    ///
-    /// NOTE: This method is guarded by a minimum build version check. This
-    /// method could break backward compatibility on an upgrade.
-    public fun upgrade_contract(
+    public fun authorize_upgrade(
         token_bridge_state: &mut State,
-        wormhole_state: &WormholeState,
-        vaa_buf: vector<u8>,
-        the_clock: &Clock
+        msg: GovernanceMessage
     ): UpgradeTicket {
         // Do not allow this VAA to be replayed.
-        let msg =
-            governance_message::parse_verify_and_consume_vaa(
-                state::borrow_mut_consumed_vaas(token_bridge_state),
-                wormhole_state,
-                vaa_buf,
-                the_clock
-            );
+        consumed_vaas::consume(
+            state::borrow_mut_consumed_vaas(token_bridge_state),
+            governance_message::vaa_hash(&msg)
+        );
 
         // Proceed with processing new implementation version.
         handle_upgrade_contract(token_bridge_state, msg)
@@ -69,15 +60,10 @@ module token_bridge::upgrade_contract {
         self: &mut State,
         receipt: UpgradeReceipt,
     ) {
-        let latest_package_id = state::commit_upgrade(self, receipt);
+        let (old_contract, new_contract) = state::commit_upgrade(self, receipt);
 
         // Emit an event reflecting package ID change.
-        event::emit(
-            ContractUpgraded {
-                old_contract: object::id_from_address(@token_bridge),
-                new_contract: latest_package_id
-            }
-        );
+        event::emit(ContractUpgraded { old_contract, new_contract });
     }
 
     fun handle_upgrade_contract(
