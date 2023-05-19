@@ -2,16 +2,16 @@
 
 /// This module implements handling a governance VAA to enact transferring some
 /// amount of collected fees to an intended recipient.
-module wormhole::transfer_fee {
+module pyth_wormhole::transfer_fee {
     use sui::coin::{Self};
     use sui::transfer::{Self};
     use sui::tx_context::{TxContext};
 
-    use wormhole::bytes32::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{Self};
-    use wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
-    use wormhole::state::{Self, State, LatestOnly};
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{Self};
+    use pyth_wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
+    use pyth_wormhole::state::{Self, State, LatestOnly};
 
     /// Specific governance payload ID (action) for setting Wormhole fee.
     const ACTION_TRANSFER_FEE: u8 = 4;
@@ -105,22 +105,22 @@ module wormhole::transfer_fee {
 }
 
 #[test_only]
-module wormhole::transfer_fee_tests {
+module pyth_wormhole::transfer_fee_tests {
     use sui::balance::{Self};
     use sui::coin::{Self, Coin};
     use sui::sui::{SUI};
     use sui::test_scenario::{Self};
 
-    use wormhole::bytes::{Self};
-    use wormhole::bytes32::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{Self};
-    use wormhole::governance_message::{Self};
-    use wormhole::state::{Self};
-    use wormhole::transfer_fee::{Self};
-    use wormhole::vaa::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{Self};
+    use pyth_wormhole::governance_message::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::transfer_fee::{Self};
+    use pyth_wormhole::vaa::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_clock,
         return_state,
@@ -141,7 +141,7 @@ module wormhole::transfer_fee_tests {
     #[test]
     fun test_transfer_fee() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let (caller, recipient) = two_people();
@@ -211,7 +211,7 @@ module wormhole::transfer_fee_tests {
     #[test]
     fun test_transfer_fee_after_upgrade() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();
@@ -269,10 +269,10 @@ module wormhole::transfer_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::set::E_KEY_ALREADY_EXISTS)]
+    #[expected_failure(abort_code = pyth_wormhole::set::E_KEY_ALREADY_EXISTS)]
     fun test_cannot_transfer_fee_with_same_vaa() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();
@@ -324,7 +324,7 @@ module wormhole::transfer_fee_tests {
     #[expected_failure(abort_code = sui::balance::ENotEnough)]
     fun test_cannot_transfer_fee_insufficient_balance() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();
@@ -367,7 +367,7 @@ module wormhole::transfer_fee_tests {
     #[expected_failure(abort_code = external_address::E_ZERO_ADDRESS)]
     fun test_cannot_transfer_fee_recipient_zero_address() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();
@@ -414,10 +414,10 @@ module wormhole::transfer_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::bytes32::E_U64_OVERFLOW)]
+    #[expected_failure(abort_code = pyth_wormhole::bytes32::E_U64_OVERFLOW)]
     fun test_cannot_transfer_fee_withdraw_amount_overflow() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();
@@ -461,10 +461,10 @@ module wormhole::transfer_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_set_fee_outdated_version() {
         // Testing this method.
-        use wormhole::transfer_fee::{transfer_fee};
+        use pyth_wormhole::transfer_fee::{transfer_fee};
 
         // Set up.
         let caller = person();

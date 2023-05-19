@@ -3,7 +3,7 @@
 /// This module implements a mechanism to parse and verify VAAs, which are
 /// verified Wormhole messages (messages with Guardian signatures attesting to
 /// its observation). Signatures on VAA are checked against an existing Guardian
-/// set that exists in the `State` (see `wormhole::state`).
+/// set that exists in the `State` (see `pyth_wormhole::state`).
 ///
 /// A Wormhole integrator is discouraged from integrating `parse_and_verify` in
 /// his contract. If there is a breaking change to the `vaa` module, Wormhole
@@ -19,21 +19,21 @@
 ///
 /// A good example of how this methodology is implemented is how the Token
 /// Bridge contract redeems its VAAs.
-module wormhole::vaa {
+module pyth_wormhole::vaa {
     use std::option::{Self};
     use std::vector::{Self};
     use sui::clock::{Clock};
     use sui::hash::{keccak256};
 
-    use wormhole::bytes::{Self};
-    use wormhole::bytes32::{Self, Bytes32};
-    use wormhole::consumed_vaas::{Self, ConsumedVAAs};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{Self, ExternalAddress};
-    use wormhole::guardian::{Self};
-    use wormhole::guardian_set::{Self, GuardianSet};
-    use wormhole::guardian_signature::{Self, GuardianSignature};
-    use wormhole::state::{Self, State};
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::consumed_vaas::{Self, ConsumedVAAs};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{Self, ExternalAddress};
+    use pyth_wormhole::guardian::{Self};
+    use pyth_wormhole::guardian_set::{Self, GuardianSet};
+    use pyth_wormhole::guardian_signature::{Self, GuardianSignature};
+    use pyth_wormhole::state::{Self, State};
 
     /// Incorrect VAA version.
     const E_WRONG_VERSION: u64 = 0;
@@ -367,18 +367,18 @@ module wormhole::vaa {
 }
 
 #[test_only]
-module wormhole::vaa_tests {
+module pyth_wormhole::vaa_tests {
     use std::vector::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::bytes32::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{Self};
-    use wormhole::guardian_signature::{Self};
-    use wormhole::state::{Self};
-    use wormhole::vaa::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{Self};
+    use pyth_wormhole::guardian_signature::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::vaa::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         guardians,
         person,
         return_clock,
@@ -569,7 +569,7 @@ module wormhole::vaa_tests {
         // body. So the hash we need to check against is keccak256 of this
         // message.
         let body_buf = {
-            use wormhole::bytes::{Self};
+            use pyth_wormhole::bytes::{Self};
 
             let buf = vector::empty();
             bytes::push_u32_be(&mut buf, vaa::timestamp(&parsed));
@@ -605,7 +605,7 @@ module wormhole::vaa_tests {
     #[test]
     fun test_parse_and_verify() {
         // Testing this method.
-        use wormhole::vaa::{parse_and_verify};
+        use pyth_wormhole::vaa::{parse_and_verify};
 
         // Set up.
         let caller = person();
@@ -643,7 +643,7 @@ module wormhole::vaa_tests {
     #[expected_failure(abort_code = vaa::E_NO_QUORUM)]
     fun test_cannot_parse_and_verify_without_quorum() {
         // Testing this method.
-        use wormhole::vaa::{parse_and_verify};
+        use pyth_wormhole::vaa::{parse_and_verify};
 
         // Set up.
         let caller = person();
@@ -673,7 +673,7 @@ module wormhole::vaa_tests {
     #[expected_failure(abort_code = vaa::E_NON_INCREASING_SIGNERS)]
     fun test_cannot_parse_and_verify_non_increasing() {
         // Testing this method.
-        use wormhole::vaa::{parse_and_verify};
+        use pyth_wormhole::vaa::{parse_and_verify};
 
         // Set up.
         let caller = person();
@@ -704,7 +704,7 @@ module wormhole::vaa_tests {
     #[expected_failure(abort_code = vaa::E_INVALID_SIGNATURE)]
     fun test_cannot_parse_and_verify_invalid_signature() {
         // Testing this method.
-        use wormhole::vaa::{parse_and_verify};
+        use pyth_wormhole::vaa::{parse_and_verify};
 
         // Set up.
         let caller = person();
@@ -739,10 +739,10 @@ module wormhole::vaa_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_parse_and_verify_outdated_version() {
         // Testing this method.
-        use wormhole::vaa::{parse_and_verify};
+        use pyth_wormhole::vaa::{parse_and_verify};
 
         // Set up.
         let caller = person();

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache 2
 
 /// This module implements a `Guardian` that warehouses a 20-byte public key.
-module wormhole::guardian {
+module pyth_wormhole::guardian {
     use std::vector::{Self};
     use sui::hash::{Self};
     use sui::ecdsa_k1::{Self};
 
-    use wormhole::bytes20::{Self, Bytes20};
-    use wormhole::guardian_signature::{Self, GuardianSignature};
+    use pyth_wormhole::bytes20::{Self, Bytes20};
+    use pyth_wormhole::guardian_signature::{Self, GuardianSignature};
 
     /// Guardian public key is all zeros.
     const E_ZERO_ADDRESS: u64 = 1;

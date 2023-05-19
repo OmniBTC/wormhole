@@ -6,7 +6,7 @@
 /// Wormhole messages (requires depositing a message fee), verifying `VAA` by
 /// checking signatures versus an existing Guardian set, and generating new
 /// emitters for Wormhole integrators.
-module wormhole::state {
+module pyth_wormhole::state {
     use std::vector::{Self};
     use sui::balance::{Balance};
     use sui::clock::{Clock};
@@ -16,25 +16,25 @@ module wormhole::state {
     use sui::table::{Self, Table};
     use sui::tx_context::{TxContext};
 
-    use wormhole::bytes32::{Self, Bytes32};
-    use wormhole::consumed_vaas::{Self, ConsumedVAAs};
-    use wormhole::external_address::{ExternalAddress};
-    use wormhole::fee_collector::{Self, FeeCollector};
-    use wormhole::guardian::{Guardian};
-    use wormhole::guardian_set::{Self, GuardianSet};
-    use wormhole::package_utils::{Self};
-    use wormhole::version_control::{Self};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::consumed_vaas::{Self, ConsumedVAAs};
+    use pyth_wormhole::external_address::{ExternalAddress};
+    use pyth_wormhole::fee_collector::{Self, FeeCollector};
+    use pyth_wormhole::guardian::{Guardian};
+    use pyth_wormhole::guardian_set::{Self, GuardianSet};
+    use pyth_wormhole::package_utils::{Self};
+    use pyth_wormhole::version_control::{Self};
 
-    friend wormhole::emitter;
-    friend wormhole::governance_message;
-    friend wormhole::migrate;
-    friend wormhole::publish_message;
-    friend wormhole::set_fee;
-    friend wormhole::setup;
-    friend wormhole::transfer_fee;
-    friend wormhole::update_guardian_set;
-    friend wormhole::upgrade_contract;
-    friend wormhole::vaa;
+    friend pyth_wormhole::emitter;
+    friend pyth_wormhole::governance_message;
+    friend pyth_wormhole::migrate;
+    friend pyth_wormhole::publish_message;
+    friend pyth_wormhole::set_fee;
+    friend pyth_wormhole::setup;
+    friend pyth_wormhole::transfer_fee;
+    friend pyth_wormhole::update_guardian_set;
+    friend pyth_wormhole::upgrade_contract;
+    friend pyth_wormhole::vaa;
 
     /// Cannot initialize state with zero guardians.
     const E_ZERO_GUARDIANS: u64 = 0;
@@ -175,7 +175,7 @@ module wormhole::state {
     /// Retrieve a particular Guardian set by its Guardian set index. This
     /// method is used when verifying a VAA.
     ///
-    /// See `wormhole::vaa` for more info.
+    /// See `pyth_wormhole::vaa` for more info.
     public fun guardian_set_at(
         self: &State,
         index: u32
@@ -262,11 +262,11 @@ module wormhole::state {
     }
 
     /// Deposit fee when sending Wormhole message. This method does not
-    /// necessarily have to be a `friend` to `wormhole::publish_message`. But
+    /// necessarily have to be a `friend` to `pyth_wormhole::publish_message`. But
     /// we also do not want an integrator to mistakenly deposit fees outside
     /// of calling `publish_message`.
     ///
-    /// See `wormhole::publish_message` for more info.
+    /// See `pyth_wormhole::publish_message` for more info.
     public(friend) fun deposit_fee(
         _: &LatestOnly,
         self: &mut State,
@@ -278,7 +278,7 @@ module wormhole::state {
     /// Withdraw collected fees when governance action to transfer fees to a
     /// particular recipient.
     ///
-    /// See `wormhole::transfer_fee` for more info.
+    /// See `pyth_wormhole::transfer_fee` for more info.
     public(friend) fun withdraw_fee(
         _: &LatestOnly,
         self: &mut State,
@@ -317,7 +317,7 @@ module wormhole::state {
     /// See `guardian_set_epochs_to_live` for the parameter that determines how
     /// long a Guardian set can live for.
     ///
-    /// See `wormhole::update_guardian_set` for more info.
+    /// See `pyth_wormhole::update_guardian_set` for more info.
     public(friend) fun expire_guardian_set(
         _: &LatestOnly,
         self: &mut State,
@@ -333,7 +333,7 @@ module wormhole::state {
     /// Add the latest Guardian set from the governance action to update the
     /// current guardian set.
     ///
-    /// See `wormhole::update_guardian_set` for more info.
+    /// See `pyth_wormhole::update_guardian_set` for more info.
     public(friend) fun add_new_guardian_set(
         _: &LatestOnly,
         self: &mut State,
@@ -349,7 +349,7 @@ module wormhole::state {
 
     /// Modify the cost to send a Wormhole message via governance.
     ///
-    /// See `wormhole::set_fee` for more info.
+    /// See `pyth_wormhole::set_fee` for more info.
     public(friend) fun set_message_fee(
         _: &LatestOnly,
         self: &mut State,

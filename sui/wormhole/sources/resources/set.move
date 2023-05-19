@@ -4,7 +4,7 @@
 /// `Set` leverages `sui::table` to store unique keys of the same type.
 ///
 /// NOTE: Items added to this data structure cannot be removed.
-module wormhole::set {
+module pyth_wormhole::set {
     use sui::table::{Self, Table};
     use sui::tx_context::{TxContext};
 
@@ -53,10 +53,10 @@ module wormhole::set {
 }
 
 #[test_only]
-module wormhole::set_tests {
+module pyth_wormhole::set_tests {
     use sui::tx_context::{Self};
 
-    use wormhole::set::{Self};
+    use pyth_wormhole::set::{Self};
 
     #[test]
     public fun test_add_and_contains() {

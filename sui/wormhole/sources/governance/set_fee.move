@@ -2,11 +2,11 @@
 
 /// This module implements handling a governance VAA to enact setting the
 /// Wormhole message fee to another amount.
-module wormhole::set_fee {
-    use wormhole::bytes32::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
-    use wormhole::state::{Self, State};
+module pyth_wormhole::set_fee {
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
+    use pyth_wormhole::state::{Self, State};
 
     /// Specific governance payload ID (action) for setting Wormhole fee.
     const ACTION_SET_FEE: u8 = 3;
@@ -75,18 +75,18 @@ module wormhole::set_fee {
 }
 
 #[test_only]
-module wormhole::set_fee_tests {
+module pyth_wormhole::set_fee_tests {
     use sui::balance::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::governance_message::{Self};
-    use wormhole::set_fee::{Self};
-    use wormhole::state::{Self};
-    use wormhole::vaa::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::governance_message::{Self};
+    use pyth_wormhole::set_fee::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::vaa::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_clock,
         return_state,
@@ -106,7 +106,7 @@ module wormhole::set_fee_tests {
     #[test]
     fun test_set_fee() {
         // Testing this method.
-        use wormhole::set_fee::{set_fee};
+        use pyth_wormhole::set_fee::{set_fee};
 
         // Set up.
         let caller = person();
@@ -166,7 +166,7 @@ module wormhole::set_fee_tests {
     #[test]
     fun test_set_fee_after_upgrade() {
         // Testing this method.
-        use wormhole::set_fee::{set_fee};
+        use pyth_wormhole::set_fee::{set_fee};
 
         // Set up.
         let caller = person();
@@ -207,10 +207,10 @@ module wormhole::set_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::set::E_KEY_ALREADY_EXISTS)]
+    #[expected_failure(abort_code = pyth_wormhole::set::E_KEY_ALREADY_EXISTS)]
     fun test_cannot_set_fee_with_same_vaa() {
         // Testing this method.
-        use wormhole::set_fee::{set_fee};
+        use pyth_wormhole::set_fee::{set_fee};
 
         // Set up.
         let caller = person();
@@ -247,10 +247,10 @@ module wormhole::set_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::bytes32::E_U64_OVERFLOW)]
+    #[expected_failure(abort_code = pyth_wormhole::bytes32::E_U64_OVERFLOW)]
     fun test_cannot_set_fee_with_overflow() {
         // Testing this method.
-        use wormhole::set_fee::{set_fee};
+        use pyth_wormhole::set_fee::{set_fee};
 
         // Set up.
         let caller = person();
@@ -293,10 +293,10 @@ module wormhole::set_fee_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_set_fee_outdated_version() {
         // Testing this method.
-        use wormhole::set_fee::{set_fee};
+        use pyth_wormhole::set_fee::{set_fee};
 
         // Set up.
         let caller = person();

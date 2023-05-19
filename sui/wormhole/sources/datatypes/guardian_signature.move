@@ -3,10 +3,10 @@
 /// This module implements a custom type representing a Guardian's signature
 /// with recovery ID of a particular hashed VAA message body. The components of
 /// `GuardianSignature` are used to perform public key recovery using ECDSA.
-module wormhole::guardian_signature {
+module pyth_wormhole::guardian_signature {
     use std::vector::{Self};
 
-    use wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
 
     /// Container for elliptic curve signature parameters and Guardian index.
     struct GuardianSignature has store, drop {

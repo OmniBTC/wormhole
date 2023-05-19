@@ -3,7 +3,7 @@
 /// This module implements a container that collects fees in SUI denomination.
 /// The `FeeCollector` requires that the fee deposited is exactly equal to the
 /// `fee_amount` configured.
-module wormhole::fee_collector {
+module pyth_wormhole::fee_collector {
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
     use sui::sui::{SUI};
@@ -75,11 +75,11 @@ module wormhole::fee_collector {
 }
 
 #[test_only]
-module wormhole::fee_collector_tests {
+module pyth_wormhole::fee_collector_tests {
     use sui::coin::{Self};
     use sui::tx_context::{Self};
 
-    use wormhole::fee_collector::{Self};
+    use pyth_wormhole::fee_collector::{Self};
 
     #[test]
     public fun test_fee_collector() {

@@ -2,15 +2,15 @@
 
 /// This module implements the mechanism to publish the Wormhole contract and
 /// initialize `State` as a shared object.
-module wormhole::setup {
+module pyth_wormhole::setup {
     use std::vector::{Self};
     use sui::object::{Self, UID};
     use sui::package::{Self, UpgradeCap};
     use sui::transfer::{Self};
     use sui::tx_context::{Self, TxContext};
 
-    use wormhole::cursor::{Self};
-    use wormhole::state::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::state::{Self};
 
     /// Capability created at `init`, which will be destroyed once
     /// `init_and_share_state` is called. This ensures only the deployer can
@@ -53,7 +53,7 @@ module wormhole::setup {
         message_fee: u64,
         ctx: &mut TxContext
     ) {
-        wormhole::package_utils::assert_package_upgrade_cap<DeployerCap>(
+        pyth_wormhole::package_utils::assert_package_upgrade_cap<DeployerCap>(
             &upgrade_cap,
             package::compatible_policy(),
             1
@@ -69,7 +69,7 @@ module wormhole::setup {
             while (!cursor::is_empty(&cur)) {
                 vector::push_back(
                     &mut out,
-                    wormhole::guardian::new(cursor::poke(&mut cur))
+                    pyth_wormhole::guardian::new(cursor::poke(&mut cur))
                 );
             };
             cursor::destroy_empty(cur);
@@ -81,8 +81,8 @@ module wormhole::setup {
             state::new(
                 upgrade_cap,
                 governance_chain,
-                wormhole::external_address::new_nonzero(
-                    wormhole::bytes32::from_bytes(governance_contract)
+                pyth_wormhole::external_address::new_nonzero(
+                    pyth_wormhole::bytes32::from_bytes(governance_contract)
                 ),
                 guardian_set_index,
                 guardians,
@@ -95,21 +95,21 @@ module wormhole::setup {
 }
 
 #[test_only]
-module wormhole::setup_tests {
+module pyth_wormhole::setup_tests {
     use std::option::{Self};
     use std::vector::{Self};
     use sui::package::{Self};
     use sui::object::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::bytes32::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{Self};
-    use wormhole::guardian::{Self};
-    use wormhole::guardian_set::{Self};
-    use wormhole::setup::{Self, DeployerCap};
-    use wormhole::state::{Self, State};
-    use wormhole::wormhole_scenario::{person};
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{Self};
+    use pyth_wormhole::guardian::{Self};
+    use pyth_wormhole::guardian_set::{Self};
+    use pyth_wormhole::setup::{Self, DeployerCap};
+    use pyth_wormhole::state::{Self, State};
+    use pyth_wormhole::wormhole_scenario::{person};
 
     #[test]
     fun test_init() {
@@ -271,7 +271,7 @@ module wormhole::setup_tests {
 
     #[test]
     #[expected_failure(
-        abort_code = wormhole::package_utils::E_INVALID_UPGRADE_CAP
+        abort_code = pyth_wormhole::package_utils::E_INVALID_UPGRADE_CAP
     )]
     fun test_cannot_complete_invalid_upgrade_cap() {
         let deployer = person();

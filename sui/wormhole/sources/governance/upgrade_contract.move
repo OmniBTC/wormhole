@@ -7,16 +7,16 @@
 /// 2.  Authorize upgrade.
 /// 3.  Upgrade.
 /// 4.  Commit upgrade.
-module wormhole::upgrade_contract {
+module pyth_wormhole::upgrade_contract {
     use sui::object::{ID};
     use sui::package::{UpgradeReceipt, UpgradeTicket};
 
-    use wormhole::bytes32::{Self, Bytes32};
-    use wormhole::cursor::{Self};
-    use wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
-    use wormhole::state::{Self, State};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
+    use pyth_wormhole::state::{Self, State};
 
-    friend wormhole::migrate;
+    friend pyth_wormhole::migrate;
 
     /// Digest is all zeros.
     const E_DIGEST_ZERO_BYTES: u64 = 0;
@@ -121,6 +121,6 @@ module wormhole::upgrade_contract {
 }
 
 #[test_only]
-module wormhole::upgrade_contract_tests {
+module pyth_wormhole::upgrade_contract_tests {
     // TODO
 }

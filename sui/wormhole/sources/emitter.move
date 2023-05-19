@@ -3,13 +3,13 @@
 /// This module implements a capability (`EmitterCap`), which allows one to send
 /// Wormhole messages. Its external address is determined by the capability's
 /// `id`, which is a 32-byte vector.
-module wormhole::emitter {
+module pyth_wormhole::emitter {
     use sui::object::{Self, ID, UID};
     use sui::tx_context::{TxContext};
 
-    use wormhole::state::{Self, State};
+    use pyth_wormhole::state::{Self, State};
 
-    friend wormhole::publish_message;
+    friend pyth_wormhole::publish_message;
 
     /// Event reflecting when `new` is called.
     struct EmitterCreated has drop, copy {
@@ -93,14 +93,14 @@ module wormhole::emitter {
 }
 
 #[test_only]
-module wormhole::emitter_tests {
+module pyth_wormhole::emitter_tests {
     use sui::object::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::emitter::{Self};
-    use wormhole::state::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::emitter::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_state,
         set_up_wormhole,
@@ -145,7 +145,7 @@ module wormhole::emitter_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_new_emitter_outdated_version() {
         // Set up.
         let caller = person();

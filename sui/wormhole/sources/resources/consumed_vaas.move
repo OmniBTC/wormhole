@@ -1,8 +1,8 @@
-module wormhole::consumed_vaas {
+module pyth_wormhole::consumed_vaas {
     use sui::tx_context::{TxContext};
 
-    use wormhole::bytes32::{Bytes32};
-    use wormhole::set::{Self, Set};
+    use pyth_wormhole::bytes32::{Bytes32};
+    use pyth_wormhole::set::{Self, Set};
 
     /// Container storing VAA hashes (digests). This will be checked against in
     /// `parse_verify_and_consume` so a particular VAA cannot be replayed. It

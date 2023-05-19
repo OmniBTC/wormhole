@@ -3,18 +3,18 @@
 /// This module implements a container that keeps track of a list of Guardian
 /// public keys and which Guardian set index this list of Guardians represents.
 /// Each guardian set is unique and there should be no two sets that have the
-/// same Guardian set index (which requirement is handled in `wormhole::state`).
+/// same Guardian set index (which requirement is handled in `pyth_wormhole::state`).
 ///
 /// If the current Guardian set is not the latest one, its `expiration_time` is
 /// configured, which defines how long the past Guardian set can be active.
-module wormhole::guardian_set {
+module pyth_wormhole::guardian_set {
     use std::vector::{Self};
     use sui::clock::{Self, Clock};
 
-    use wormhole::guardian::{Self, Guardian};
+    use pyth_wormhole::guardian::{Self, Guardian};
 
     // Needs `set_expiration`.
-    friend wormhole::state;
+    friend pyth_wormhole::state;
 
     /// Found duplicate public key.
     const E_DUPLICATE_GUARDIAN: u64 = 0;
@@ -111,7 +111,7 @@ module wormhole::guardian_set {
 
     #[test_only]
     public fun destroy(set: GuardianSet) {
-        use wormhole::guardian::{Self};
+        use pyth_wormhole::guardian::{Self};
 
         let GuardianSet {
             index: _,
@@ -127,11 +127,11 @@ module wormhole::guardian_set {
 }
 
 #[test_only]
-module wormhole::guardian_set_tests {
+module pyth_wormhole::guardian_set_tests {
     use std::vector::{Self};
 
-    use wormhole::guardian::{Self};
-    use wormhole::guardian_set::{Self};
+    use pyth_wormhole::guardian::{Self};
+    use pyth_wormhole::guardian_set::{Self};
 
     #[test]
     fun test_new() {

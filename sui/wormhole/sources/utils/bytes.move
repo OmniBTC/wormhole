@@ -3,12 +3,12 @@
 /// This module implements a library that serializes and deserializes specific
 /// types into a buffer (i.e. `vector<u8>`). For serialization, the first
 /// argument will be of `&mut vector<u8>`. For deserialization, the first
-/// argument will be of `&mut Cursor<u8>` (see `wormhole::cursor` for more
+/// argument will be of `&mut Cursor<u8>` (see `pyth_wormhole::cursor` for more
 /// details).
-module wormhole::bytes {
+module pyth_wormhole::bytes {
     use std::vector::{Self};
     use std::bcs::{Self};
-    use wormhole::cursor::{Self, Cursor};
+    use pyth_wormhole::cursor::{Self, Cursor};
 
     public fun push_u8(buf: &mut vector<u8>, v: u8) {
         vector::push_back<u8>(buf, v);
@@ -106,10 +106,10 @@ module wormhole::bytes {
 }
 
 #[test_only]
-module wormhole::bytes_tests {
+module pyth_wormhole::bytes_tests {
     use std::vector::{Self};
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Self};
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Self};
 
     #[test]
     fun test_push_u8(){

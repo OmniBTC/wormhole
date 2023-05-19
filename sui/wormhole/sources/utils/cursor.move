@@ -7,7 +7,7 @@
 ///
 /// This setup statically guarantees that the parsing methods consume the full
 /// input.
-module wormhole::cursor {
+module pyth_wormhole::cursor {
     use std::vector::{Self};
 
     /// Container for the underlying `vector<u8>` data to be consumed.

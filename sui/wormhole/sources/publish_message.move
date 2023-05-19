@@ -23,14 +23,14 @@
 /// executes `publish_message` using the latest Wormhole package ID and to
 /// implement `prepare_message` in his contract to produce `MessageTicket`,
 /// which `publish_message` consumes.
-module wormhole::publish_message {
+module pyth_wormhole::publish_message {
     use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
     use sui::object::{Self, ID};
     use sui::sui::{SUI};
 
-    use wormhole::emitter::{Self, EmitterCap};
-    use wormhole::state::{Self, State};
+    use pyth_wormhole::emitter::{Self, EmitterCap};
+    use pyth_wormhole::state::{Self, State};
 
     /// This type is emitted via `sui::event` module. Guardians pick up this
     /// observation and attest to its existence.
@@ -163,15 +163,15 @@ module wormhole::publish_message {
 }
 
 #[test_only]
-module wormhole::publish_message_tests {
+module pyth_wormhole::publish_message_tests {
     use sui::coin::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::emitter::{Self, EmitterCap};
-    use wormhole::fee_collector::{Self};
-    use wormhole::state::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::emitter::{Self, EmitterCap};
+    use pyth_wormhole::fee_collector::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_clock,
         return_state,
@@ -185,7 +185,7 @@ module wormhole::publish_message_tests {
     /// This test verifies that `publish_message` is successfully called when
     /// the specified message fee is used.
     fun test_publish_message() {
-        use wormhole::publish_message::{prepare_message, publish_message};
+        use pyth_wormhole::publish_message::{prepare_message, publish_message};
 
         let user = person();
         let my_scenario = test_scenario::begin(user);
@@ -205,7 +205,7 @@ module wormhole::publish_message_tests {
 
             // User needs an `EmitterCap` so he can send a message.
             let emitter_cap =
-                wormhole::emitter::new(
+                pyth_wormhole::emitter::new(
                     &worm_state,
                     test_scenario::ctx(scenario)
                 );
@@ -317,7 +317,7 @@ module wormhole::publish_message_tests {
     /// This test verifies that `publish_message` fails when the fee is not the
     /// correct amount. `FeeCollector` will be the reason for this abort.
     fun test_cannot_publish_message_with_incorrect_fee() {
-        use wormhole::publish_message::{prepare_message, publish_message};
+        use pyth_wormhole::publish_message::{prepare_message, publish_message};
 
         let user = person();
         let my_scenario = test_scenario::begin(user);
@@ -363,11 +363,11 @@ module wormhole::publish_message_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     /// This test verifies that `publish_message` will fail if the minimum
     /// required version is greater than the current build's.
     fun test_cannot_publish_message_outdated_version() {
-        use wormhole::publish_message::{prepare_message, publish_message};
+        use pyth_wormhole::publish_message::{prepare_message, publish_message};
 
         let user = person();
         let my_scenario = test_scenario::begin(user);
