@@ -35,7 +35,7 @@ module pyth_wormhole::setup {
         // This will be created and sent to the transaction sender
         // automatically when the contract is published.
         transfer::public_transfer(
-            sui::package::test_publish(object::id_from_address(@wormhole), ctx),
+            sui::package::test_publish(object::id_from_address(@pyth_wormhole), ctx),
             tx_context::sender(ctx)
         );
     }
@@ -179,7 +179,7 @@ module pyth_wormhole::setup_tests {
         // it from the sender.
         let upgrade_cap =
             package::test_publish(
-                object::id_from_address(@wormhole),
+                object::id_from_address(@pyth_wormhole),
                 test_scenario::ctx(scenario)
             );
 
