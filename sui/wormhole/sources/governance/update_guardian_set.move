@@ -4,16 +4,16 @@
 /// current guardian set to be a new set of guardian public keys. As a part of
 /// this process, the previous guardian set's expiration time is set. Keep in
 /// mind that the current guardian set has no expiration.
-module wormhole::update_guardian_set {
+module pyth_wormhole::update_guardian_set {
     use std::vector::{Self};
     use sui::clock::{Clock};
 
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
-    use wormhole::guardian::{Self, Guardian};
-    use wormhole::guardian_set::{Self};
-    use wormhole::state::{Self, State, LatestOnly};
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
+    use pyth_wormhole::guardian::{Self, Guardian};
+    use pyth_wormhole::guardian_set::{Self};
+    use pyth_wormhole::state::{Self, State, LatestOnly};
 
     /// No guardians public keys found in VAA.
     const E_NO_GUARDIANS: u64 = 0;
@@ -134,21 +134,21 @@ module wormhole::update_guardian_set {
 }
 
 #[test_only]
-module wormhole::update_guardian_set_tests {
+module pyth_wormhole::update_guardian_set_tests {
     use std::vector::{Self};
     use sui::clock::{Self};
     use sui::test_scenario::{Self};
 
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Self};
-    use wormhole::governance_message::{Self};
-    use wormhole::guardian::{Self};
-    use wormhole::guardian_set::{Self};
-    use wormhole::state::{Self};
-    use wormhole::update_guardian_set::{Self};
-    use wormhole::vaa::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::governance_message::{Self};
+    use pyth_wormhole::guardian::{Self};
+    use pyth_wormhole::guardian_set::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::update_guardian_set::{Self};
+    use pyth_wormhole::vaa::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_clock,
         return_state,
@@ -170,7 +170,7 @@ module wormhole::update_guardian_set_tests {
     #[test]
     fun test_update_guardian_set() {
         // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
+        use pyth_wormhole::update_guardian_set::{update_guardian_set};
 
         // Set up.
         let caller = person();
@@ -270,7 +270,7 @@ module wormhole::update_guardian_set_tests {
     #[test]
     fun test_update_guardian_set_after_upgrade() {
         // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
+        use pyth_wormhole::update_guardian_set::{update_guardian_set};
 
         // Set up.
         let caller = person();
@@ -316,7 +316,7 @@ module wormhole::update_guardian_set_tests {
     )]
     fun test_cannot_update_guardian_set_again_with_same_vaa() {
         // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
+        use pyth_wormhole::update_guardian_set::{update_guardian_set};
 
         // Set up.
         let caller = person();
@@ -377,7 +377,7 @@ module wormhole::update_guardian_set_tests {
     #[expected_failure(abort_code = update_guardian_set::E_NO_GUARDIANS)]
     fun test_cannot_update_guardian_set_with_no_guardians() {
         // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
+        use pyth_wormhole::update_guardian_set::{update_guardian_set};
 
         // Set up.
         let caller = person();
@@ -423,10 +423,10 @@ module wormhole::update_guardian_set_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_set_fee_outdated_version() {
         // Testing this method.
-        use wormhole::update_guardian_set::{update_guardian_set};
+        use pyth_wormhole::update_guardian_set::{update_guardian_set};
 
         // Set up.
         let caller = person();

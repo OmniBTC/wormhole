@@ -4,8 +4,8 @@
 /// used to determine the latest version for this build. If the current version
 /// is not this build's, then paths through the `state` module will abort.
 ///
-/// See `wormhole::state` and `wormhole::package_utils` for more info.
-module wormhole::version_control {
+/// See `pyth_wormhole::state` and `pyth_wormhole::package_utils` for more info.
+module pyth_wormhole::version_control {
     ////////////////////////////////////////////////////////////////////////////
     //
     //  Hard-coded Version Control
@@ -50,10 +50,10 @@ module wormhole::version_control {
     //
     ////////////////////////////////////////////////////////////////////////////
 
-    friend wormhole::state;
+    friend pyth_wormhole::state;
 
     #[test_only]
-    friend wormhole::package_utils_tests;
+    friend pyth_wormhole::package_utils_tests;
 
     #[test_only]
     public fun dummy(): V__DUMMY {

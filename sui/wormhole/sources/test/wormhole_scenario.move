@@ -7,17 +7,17 @@
 /// main Wormhole repository at https://github.com/wormhole-foundation/wormhole
 /// for the key), which allows an integrator to generate his own VAAs and
 /// validate them with this test-only Wormhole instance.
-module wormhole::wormhole_scenario {
+module pyth_wormhole::wormhole_scenario {
     use std::vector::{Self};
     use sui::clock::{Self, Clock};
     use sui::package::{UpgradeCap};
     use sui::test_scenario::{Self, Scenario};
 
-    use wormhole::emitter::{EmitterCap};
-    use wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
-    use wormhole::setup::{Self, DeployerCap};
-    use wormhole::state::{Self, State};
-    use wormhole::vaa::{Self, VAA};
+    use pyth_wormhole::emitter::{EmitterCap};
+    use pyth_wormhole::governance_message::{Self, DecreeTicket, DecreeReceipt};
+    use pyth_wormhole::setup::{Self, DeployerCap};
+    use pyth_wormhole::state::{Self, State};
+    use pyth_wormhole::vaa::{Self, VAA};
 
     const DEPLOYER: address = @0xDEADBEEF;
     const WALLET_1: address = @0xB0B1;
@@ -40,7 +40,7 @@ module wormhole::wormhole_scenario {
         test_scenario::next_tx(scenario, DEPLOYER);
 
         // `init` Wormhole contract as if it were published.
-        wormhole::setup::init_test_only(test_scenario::ctx(scenario));
+        pyth_wormhole::setup::init_test_only(test_scenario::ctx(scenario));
 
         // `init_and_share_state` will also be executed as the Wormhole deployer
         // to destroy the `DeployerCap` to create a sharable `State`.
@@ -206,7 +206,7 @@ module wormhole::wormhole_scenario {
         let worm_state = take_state(scenario);
 
         let emitter =
-            wormhole::emitter::new(&worm_state, test_scenario::ctx(scenario));
+            pyth_wormhole::emitter::new(&worm_state, test_scenario::ctx(scenario));
 
         // Clean up.
         return_state(worm_state);

@@ -7,21 +7,21 @@
 /// Included in migration is the ability to ensure that breaking changes for
 /// any of Wormhole's methods by enforcing the current build version as their
 /// required minimum version.
-module wormhole::migrate {
+module pyth_wormhole::migrate {
     use sui::clock::{Clock};
     use sui::object::{ID};
 
-    use wormhole::governance_message::{Self};
-    use wormhole::state::{Self, State};
-    use wormhole::upgrade_contract::{Self};
-    use wormhole::vaa::{Self};
+    use pyth_wormhole::governance_message::{Self};
+    use pyth_wormhole::state::{Self, State};
+    use pyth_wormhole::upgrade_contract::{Self};
+    use pyth_wormhole::vaa::{Self};
 
     /// Event reflecting when `migrate` is successfully executed.
     struct MigrateComplete has drop, copy {
         package: ID
     }
 
-    /// Execute migration logic. See `wormhole::migrate` description for more
+    /// Execute migration logic. See `pyth_wormhole::migrate` description for more
     /// info.
     public fun migrate(
         wormhole_state: &mut State,
@@ -104,11 +104,11 @@ module wormhole::migrate {
 }
 
 #[test_only]
-module wormhole::migrate_tests {
+module pyth_wormhole::migrate_tests {
     use sui::test_scenario::{Self};
 
-    use wormhole::state::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         person,
         return_clock,
         return_state,
@@ -123,7 +123,7 @@ module wormhole::migrate_tests {
 
     #[test]
     fun test_migrate() {
-        use wormhole::migrate::{migrate};
+        use pyth_wormhole::migrate::{migrate};
 
         let user = person();
         let my_scenario = test_scenario::begin(user);
@@ -147,7 +147,7 @@ module wormhole::migrate_tests {
 
         // Set up migrate (which prepares this package to be the same state as
         // a previous release).
-        wormhole::migrate::set_up_migrate(&mut worm_state);
+        pyth_wormhole::migrate::set_up_migrate(&mut worm_state);
 
         // Conveniently roll version back.
         state::reverse_migrate_version(&mut worm_state);
@@ -170,11 +170,11 @@ module wormhole::migrate_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_INCORRECT_OLD_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_INCORRECT_OLD_VERSION)]
     /// ^ This expected error may change depending on the migration. In most
-    /// cases, this will abort with `wormhole::package_utils::E_INCORRECT_OLD_VERSION`.
+    /// cases, this will abort with `pyth_wormhole::package_utils::E_INCORRECT_OLD_VERSION`.
     fun test_cannot_migrate_again() {
-        use wormhole::migrate::{migrate};
+        use pyth_wormhole::migrate::{migrate};
 
         let user = person();
         let my_scenario = test_scenario::begin(user);
@@ -198,7 +198,7 @@ module wormhole::migrate_tests {
 
         // Set up migrate (which prepares this package to be the same state as
         // a previous release).
-        wormhole::migrate::set_up_migrate(&mut worm_state);
+        pyth_wormhole::migrate::set_up_migrate(&mut worm_state);
 
         // Conveniently roll version back.
         state::reverse_migrate_version(&mut worm_state);

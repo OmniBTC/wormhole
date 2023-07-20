@@ -2,14 +2,14 @@
 
 /// This module implements a custom type representing a fixed-size array of
 /// length 32.
-module wormhole::bytes32 {
+module pyth_wormhole::bytes32 {
     use std::option::{Self};
     use std::string::{Self, String};
     use std::vector::{Self};
     use sui::bcs::{Self};
 
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Self, Cursor};
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Self, Cursor};
 
     /// Invalid vector<u8> length to create `Bytes32`.
     const E_INVALID_BYTES32: u64 = 0;
@@ -218,10 +218,10 @@ module wormhole::bytes32 {
 }
 
 #[test_only]
-module wormhole::bytes32_tests {
+module pyth_wormhole::bytes32_tests {
     use std::vector::{Self};
 
-    use wormhole::bytes32::{Self};
+    use pyth_wormhole::bytes32::{Self};
 
     #[test]
     public fun new() {

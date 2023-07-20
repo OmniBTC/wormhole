@@ -4,14 +4,14 @@
 /// action. Each governance action has an associated module name, relevant chain
 /// and payload encoding instructions/data used to perform an adminstrative
 /// change on a contract.
-module wormhole::governance_message {
-    use wormhole::bytes::{Self};
-    use wormhole::bytes32::{Self, Bytes32};
-    use wormhole::consumed_vaas::{Self, ConsumedVAAs};
-    use wormhole::cursor::{Self};
-    use wormhole::external_address::{ExternalAddress};
-    use wormhole::state::{Self, State, chain_id};
-    use wormhole::vaa::{Self, VAA};
+module pyth_wormhole::governance_message {
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::consumed_vaas::{Self, ConsumedVAAs};
+    use pyth_wormhole::cursor::{Self};
+    use pyth_wormhole::external_address::{ExternalAddress};
+    use pyth_wormhole::state::{Self, State, chain_id};
+    use pyth_wormhole::vaa::{Self, VAA};
 
     /// Guardian set used to sign VAA did not use current Guardian set.
     const E_OLD_GUARDIAN_SET_GOVERNANCE: u64 = 0;
@@ -203,18 +203,18 @@ module wormhole::governance_message {
 }
 
 #[test_only]
-module wormhole::governance_message_tests {
+module pyth_wormhole::governance_message_tests {
     use sui::test_scenario::{Self};
     use sui::tx_context::{Self};
 
-    use wormhole::bytes32::{Self};
-    use wormhole::consumed_vaas::{Self};
-    use wormhole::external_address::{Self};
-    use wormhole::governance_message::{Self};
-    use wormhole::state::{Self};
-    use wormhole::vaa::{Self};
-    use wormhole::version_control::{Self};
-    use wormhole::wormhole_scenario::{
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::consumed_vaas::{Self};
+    use pyth_wormhole::external_address::{Self};
+    use pyth_wormhole::governance_message::{Self};
+    use pyth_wormhole::state::{Self};
+    use pyth_wormhole::vaa::{Self};
+    use pyth_wormhole::version_control::{Self};
+    use pyth_wormhole::wormhole_scenario::{
         set_up_wormhole,
         person,
         return_clock,
@@ -643,7 +643,7 @@ module wormhole::governance_message_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = wormhole::package_utils::E_NOT_CURRENT_VERSION)]
+    #[expected_failure(abort_code = pyth_wormhole::package_utils::E_NOT_CURRENT_VERSION)]
     fun test_cannot_verify_vaa_outdated_version() {
         // Set up.
         let caller = person();

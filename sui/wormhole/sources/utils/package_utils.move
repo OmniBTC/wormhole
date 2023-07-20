@@ -2,13 +2,13 @@
 
 /// This module implements utilities that supplement those methods implemented
 /// in `sui::package`.
-module wormhole::package_utils {
+module pyth_wormhole::package_utils {
     use std::type_name::{Self, TypeName};
     use sui::dynamic_field::{Self as field};
     use sui::object::{Self, ID, UID};
     use sui::package::{Self, UpgradeCap, UpgradeTicket, UpgradeReceipt};
 
-    use wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
 
     /// `UpgradeCap` is not from the same package as `T`.
     const E_INVALID_UPGRADE_CAP: u64 = 0;
@@ -275,12 +275,12 @@ module wormhole::package_utils {
 }
 
 #[test_only]
-module wormhole::package_utils_tests {
+module pyth_wormhole::package_utils_tests {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self};
 
-    use wormhole::package_utils::{Self};
-    use wormhole::version_control::{Self};
+    use pyth_wormhole::package_utils::{Self};
+    use pyth_wormhole::version_control::{Self};
 
     struct State has key {
         id: UID

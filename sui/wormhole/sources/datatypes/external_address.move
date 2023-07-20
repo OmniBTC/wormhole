@@ -2,10 +2,10 @@
 
 /// This module implements a custom type for a 32-byte standardized address,
 /// which is meant to represent an address from any other network.
-module wormhole::external_address {
+module pyth_wormhole::external_address {
     use sui::object::{Self, ID};
-    use wormhole::bytes32::{Self, Bytes32};
-    use wormhole::cursor::{Cursor};
+    use pyth_wormhole::bytes32::{Self, Bytes32};
+    use pyth_wormhole::cursor::{Cursor};
 
     /// Underlying data is all zeros.
     const E_ZERO_ADDRESS: u64 = 0;
@@ -75,9 +75,9 @@ module wormhole::external_address {
 }
 
 #[test_only]
-module wormhole::external_address_tests {
-    use wormhole::bytes32::{Self};
-    use wormhole::external_address::{Self};
+module pyth_wormhole::external_address_tests {
+    use pyth_wormhole::bytes32::{Self};
+    use pyth_wormhole::external_address::{Self};
 
     #[test]
     public fun test_bytes() {

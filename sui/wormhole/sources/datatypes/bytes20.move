@@ -2,11 +2,11 @@
 
 /// This module implements a custom type representing a fixed-size array of
 /// length 20.
-module wormhole::bytes20 {
+module pyth_wormhole::bytes20 {
     use std::vector::{Self};
 
-    use wormhole::bytes::{Self};
-    use wormhole::cursor::{Cursor};
+    use pyth_wormhole::bytes::{Self};
+    use pyth_wormhole::cursor::{Cursor};
 
     /// Invalid vector<u8> length to create `Bytes20`.
     const E_INVALID_BYTES20: u64 = 0;
@@ -127,10 +127,10 @@ module wormhole::bytes20 {
 }
 
 #[test_only]
-module wormhole::bytes20_tests {
+module pyth_wormhole::bytes20_tests {
     use std::vector::{Self};
 
-    use wormhole::bytes20::{Self};
+    use pyth_wormhole::bytes20::{Self};
 
     #[test]
     public fun new() {
